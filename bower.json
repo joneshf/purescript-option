@@ -1,0 +1,40 @@
+{
+  "name": "purescript-option",
+  "description": "Safe option handling",
+  "authors": [
+    "Hardy Jones <jones3.hardy@gmail.com>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joneshf/purescript-option.git"
+  },
+  "dependencies": {
+    "purescript-argonaut-codecs": ">= 3.0.1 < 7.0.0",
+    "purescript-argonaut-core": ">= 4.0.0 < 6.0.0",
+    "purescript-codec": ">= 2.0.0 < 4.0.0",
+    "purescript-codec-argonaut": ">= 2.0.0 < 8.0.0",
+    "purescript-either": ">= 1.0.0 < 5.0.0",
+    "purescript-foreign": ">= 5.0.0 < 6.0.0",
+    "purescript-foreign-object": ">= 1.0.0 < 3.0.0",
+    "purescript-lists": ">= 4.0.0 < 6.0.0",
+    "purescript-maybe": ">= 1.0.0 < 5.0.0",
+    "purescript-profunctor": ">= 3.0.0 < 5.0.0",
+    "purescript-prelude": ">= 4.0.0 < 5.0.0",
+    "purescript-record": ">= 1.0.0 < 3.0.0",
+    "purescript-simple-json": ">= 1.0.0 < 8.0.0",
+    "purescript-transformers": ">= 3.0.0 < 5.0.0",
+    "purescript-tuples": ">= 4.0.0 < 6.0.0",
+    "purescript-type-equality": ">= 1.0.0 < 4.0.0",
+    "purescript-unsafe-coerce": ">= 1.0.0 < 5.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": ">= 4.0.0 < 5"
+  }
+}

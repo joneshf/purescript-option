@@ -1,0 +1,18 @@
+{
+  "name": "purescript-option",
+  "version": "1.0.0",
+  "description": "Optional values",
+  "main": "index.js",
+  "scripts": {
+    "test": "make test"
+  },
+  "keywords": [],
+  "author": "Hardy Jones <jones3.hardy@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "bower": "^1.8.8",
+    "purescript": "^0.13.2",
+    "purescript-psa": "^0.7.3",
+    "purty": "^4.5.1"
+  }
+}
