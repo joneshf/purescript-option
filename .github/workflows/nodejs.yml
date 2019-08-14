@@ -1,0 +1,16 @@
+name: Node CI
+
+on:
+- push
+
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@53bed0742eb3f0455187c7c7042d27f51b856f02
+    - name: Use Node.js 10.x
+      uses: actions/setup-node@dd2e8a486fdc1071872c594d5388fd6dce1a7534
+      with:
+        version: 10.x
+    - name: test
+      run: make test
