@@ -1009,7 +1009,7 @@ delete proxy option = (alter go proxy option).option
 -- | someOption = Option.empty
 -- |
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- | anotherOption = Option.set (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
 -- | ```
 empty :: forall option. Option option
 empty = Option Foreign.Object.empty
