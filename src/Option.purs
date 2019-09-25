@@ -621,7 +621,8 @@ else instance jsonCodecOptionCons ::
     record = Record.delete label record'
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
-class (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class
+  (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -983,9 +984,9 @@ alter f proxy (Option object) = { option, value }
 -- | anotherOption = Option.delete (Data.Symbol.SProxy :: _ "foo") someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 delete ::
   forall label option option' proxy value.
   Data.Symbol.IsSymbol label =>
@@ -1009,7 +1010,7 @@ delete proxy option = (alter go proxy option).option
 -- | someOption = Option.empty
 -- |
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- | anotherOption = Option.set (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
 -- | ```
 empty :: forall option. Option option
 empty = Option Foreign.Object.empty
@@ -1019,21 +1020,21 @@ empty = Option Foreign.Object.empty
 -- | E.g. The following definitions are valid.
 -- | ```PureScript
 -- | option1 :: Option.Option ( foo :: Boolean, bar :: Int )
--- | option1 = Option.fromRecord' { foo: true, bar: 31 }
+-- | option1 = Option.fromRecord { foo: true, bar: 31 }
 -- |
 -- | option2 :: Option.Option ( foo :: Boolean, bar :: Int )
--- | option2 = Option.fromRecord' {}
+-- | option2 = Option.fromRecord {}
 -- | ```
 -- |
 -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
 -- | ```PureScript
 -- | -- This will not work as it has the extra field `baz`
 -- | option3 :: Option.Option ( foo :: Boolean, bar :: Int )
--- | option3 = Option.fromRecord' { foo: true, bar: 31, baz: "hi" }
+-- | option3 = Option.fromRecord { foo: true, bar: 31, baz: "hi" }
 -- |
 -- | -- This will not work as it has the extra field `qux`
 -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
--- | option4 = Option.fromRecord' { qux: [] }
+-- | option4 = Option.fromRecord { qux: [] }
 -- | ```
 -- |
 -- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
@@ -1059,9 +1060,9 @@ fromRecord = fromRecord'
 -- | bar = Option.get (Data.Symbol.SProxy :: _ "bar") someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 get ::
   forall label option option' proxy value.
   Data.Symbol.IsSymbol label =>
@@ -1085,13 +1086,13 @@ get proxy option = (alter go proxy option).value
 -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
 -- |
--- | bar :: Data.Maybe.Maybe Int
--- | bar = Option.get (Data.Symbol.SProxy :: _ "bar") someOption
+-- | bar :: Int
+-- | bar = Option.getWithDefault 13 (Data.Symbol.SProxy :: _ "bar") someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 getWithDefault ::
   forall label option option' proxy value.
   Data.Symbol.IsSymbol label =>
@@ -1117,9 +1118,9 @@ getWithDefault default proxy option = case get proxy option of
 -- | anotherOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 insert ::
   forall label option option' proxy value.
   Data.Symbol.IsSymbol label =>
@@ -1179,9 +1180,9 @@ jsonCodec = jsonCodec'
 -- | anotherOption = Option.modify (Data.Symbol.SProxy :: _ "bar") (_ + 1) someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 modify ::
   forall label option option' option'' proxy value value'.
   Data.Symbol.IsSymbol label =>
@@ -1211,9 +1212,9 @@ modify proxy f option = (alter go proxy option).option
 -- | anotherOption = Option.set (Data.Symbol.SProxy :: _ "bar") 31 someOption
 -- | ```
 -- |
--- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
 -- |
--- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
 set ::
   forall label option option' option'' proxy value value'.
   Data.Symbol.IsSymbol label =>
@@ -1233,11 +1234,13 @@ set proxy value = modify proxy go
 -- | E.g.
 -- | ```PureScript
 -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | someOption = Option.fromRecord' { foo: true, bar: 31 }
+-- | someOption = Option.fromRecord { foo: true, bar: 31 }
 -- |
 -- | someRecord :: Record ( foo :: Data.Maybe.Maybe Boolean, bar :: Data.Maybe.Maybe Int )
--- | someRecord = Option.toRecord' someOption
+-- | someRecord = Option.toRecord someOption
 -- | ```
+-- |
+-- | This is an alias for `toRecord'` so the documentation is a bit clearer.
 toRecord ::
   forall option record.
   ToRecord option record =>
