@@ -58,6 +58,7 @@ import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
 import Control.Monad.Writer as Control.Monad.Writer
 import Control.Monad.Writer.Class as Control.Monad.Writer.Class
+import Control.Monad.State as Control.Monad.State
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
@@ -1228,6 +1229,49 @@ set proxy value = modify proxy go
   where
   go :: forall a. a -> value
   go _ = value
+
+-- | Changes a key with the given value (if it exists) to an option.
+-- | As with `set`, the key must already exist in the option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.setMay (Data.Symbol.SProxy :: _ "bar") (Just 31 someOption
+-- | ```
+-- |
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
+-- |
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
+setMay ::
+  forall label option option' proxy value.
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label value option' option =>
+  proxy label ->
+  Data.Maybe.Maybe value ->
+  Option option ->
+  Option option
+setMay proxy vMay def = modify proxy go def
+  where
+  go :: value -> value
+  go optVal = case vMay of
+    Data.Maybe.Just v -> v
+    Data.Maybe.Nothing -> optVal
+
+-- | A convenience function calling `setMay` that can be used to iteratively
+-- | mutate an existing `Option`, where mutations may occur in any order.
+-- |
+maySetOptState :: forall label option option' proxy value.
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label value option' option =>
+  proxy label ->
+  Data.Maybe.Maybe value ->
+  Option option ->
+  Control.Monad.State.State (Option option) Unit
+maySetOptState proxy vMay def = Control.Monad.State.put $ setMay proxy vMay def
+
 
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
