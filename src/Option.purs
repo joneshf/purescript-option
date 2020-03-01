@@ -18,6 +18,7 @@ module Option
   , delete
   , empty
   , get
+  , getAll
   , getWithDefault
   , insert
   , jsonCodec
@@ -34,6 +35,10 @@ module Option
   , fromRecord'
   , class FromRecordOption
   , fromRecordOption
+  , class GetAll
+  , getAll'
+  , class GetAllOption
+  , getAllOption
   , class JsonCodec
   , jsonCodec'
   , class JsonCodecOption
@@ -478,6 +483,99 @@ else instance fromRecordOptionCons ::
 
     value :: value
     value = Record.get label record
+
+-- | A typeclass that converts an `Option _` to a `Maybe (Record _)`.
+-- |
+-- | If every key exists in the option, the record of values is returned in `Just _`.
+-- |
+-- | If any key does not exist, `Nothing` is returned.
+-- |
+-- | E.g. Someone can say:
+-- | ```PureScript
+-- | someRecord :: Data.Maybe.Maybe (Record ( foo :: Boolean, bar :: Int ))
+-- | someRecord = Option.getAll' someOption
+-- | ```
+-- |
+-- | This can also be roughtly thought of as a monomorphic `Data.Traversable.sequence`.
+class GetAll (option :: #Type) (record :: #Type) | option -> record where
+  -- | Attempts to fetch all of the values from all of the keys of an option.
+  -- |
+  -- | If every key exists in the option, the record of values is returned in `Just _`.
+  -- |
+  -- | If any key does not exist in the option, `Nothing` is returned.
+  -- |
+  -- | E.g.
+  -- | ```PureScript
+  -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+  -- |
+  -- | -- This will be `Nothing` because the key `foo` does not exist in the option.
+  -- | bar :: Data.Maybe.Maybe (Record ( foo :: Boolean, bar :: Int))
+  -- | bar = Option.getAll' someOption
+  -- |
+  -- | -- This will be `Just { foo: true, bar: 31 }` because all keys exist in the option.
+  -- | bar :: Data.Maybe.Maybe (Record ( foo :: Boolean, bar :: Int))
+  -- | bar = Option.getAll' (Option.insert (Data.Symbol.SProxy :: _ "foo") true someOption)
+  -- | ```
+  getAll' ::
+    Option option ->
+    Data.Maybe.Maybe (Record record)
+
+-- | This instancce converts an `Option _` to a `Maybe (Record _)`.
+-- |
+-- | If every key exists in the option, the record of values is returned in `Just _`.
+-- |
+-- | If any key does not exist, `Nothing` is returned.
+instance getAllAny ::
+  ( Prim.RowList.RowToList option list
+  , GetAllOption list option record
+  ) =>
+  GetAll option record where
+  getAll' = getAllOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `RowList` converting an `Option _` into a `Maybe (Record _)`.
+class GetAllOption (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> option record where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  getAllOption ::
+    forall proxy.
+    proxy list ->
+    Option option ->
+    Data.Maybe.Maybe (Record record)
+
+instance getAllOptionNil ::
+  GetAllOption Prim.RowList.Nil () () where
+  getAllOption _ _ = Data.Maybe.Just {}
+else instance getAllOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , GetAllOption list option' record'
+  ) =>
+  GetAllOption (Prim.RowList.Cons label value list) option record where
+  getAllOption _ option = case record' of
+    Data.Maybe.Just record -> case value' of
+      Data.Maybe.Just value -> Data.Maybe.Just (Record.insert label value record)
+      Data.Maybe.Nothing -> Data.Maybe.Nothing
+    Data.Maybe.Nothing -> Data.Maybe.Nothing
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option' :: Option option'
+    option' = delete label option
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Data.Maybe.Maybe (Record record')
+    record' = getAllOption proxy option'
+
+    value' :: Data.Maybe.Maybe value
+    value' = get label option
 
 -- | A typeclass that converts a record of `JsonCodec`s into a `JsonCodec` for an option.
 -- |
@@ -1075,6 +1173,32 @@ get proxy option = (alter go proxy option).value
   go :: Data.Maybe.Maybe value -> Data.Maybe.Maybe value
   go value = value
 
+-- | Attempts to fetch all of the values from all of the keys of an option.
+-- |
+-- | If every key exists in the option, the record of values is returned in `Just _`.
+-- |
+-- | If any key does not exist in the option, `Nothing` is returned.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | -- This will be `Nothing` because the key `foo` does not exist in the option.
+-- | bar :: Data.Maybe.Maybe (Record ( foo :: Boolean, bar :: Int))
+-- | bar = Option.getAll someOption
+-- |
+-- | -- This will be `Just { foo: true, bar: 31 }` because all keys exist in the option.
+-- | bar :: Data.Maybe.Maybe (Record ( foo :: Boolean, bar :: Int))
+-- | bar = Option.getAll (Option.insert (Data.Symbol.SProxy :: _ "foo") true someOption)
+-- | ```
+getAll ::
+  forall option record.
+  GetAll option record =>
+  Option option ->
+  Data.Maybe.Maybe (Record record)
+getAll = getAll'
+
 -- | Attempts to fetch the value at the given key from an option falling back to the default.
 -- |
 -- | If the key exists in the option, `Just _` is returned.
@@ -1342,3 +1466,6 @@ user7 = fromRecord { age: 10 }
 
 user8 :: { age :: Data.Maybe.Maybe Int, username :: Data.Maybe.Maybe String }
 user8 = toRecord user
+
+user9 :: Data.Maybe.Maybe { age :: Int, username :: String }
+user9 = getAll user
