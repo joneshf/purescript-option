@@ -53,7 +53,6 @@ module Option
   ) where
 
 import Prelude
-
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
 import Control.Monad.Writer as Control.Monad.Writer
@@ -1225,10 +1224,10 @@ set ::
   value ->
   Option option' ->
   Option option
-set proxy value = modify proxy go
+set proxy value option = (alter go proxy option).option
   where
-  go :: forall a. a -> value
-  go _ = value
+  go :: forall a. a -> Data.Maybe.Maybe value
+  go _ = Data.Maybe.Just value
 
 -- | Changes a key with the given value (if it exists) to an option.
 -- | As with `set`, the key must already exist in the option.
@@ -1263,7 +1262,8 @@ setMay proxy vMay def = modify proxy go def
 -- | A convenience function calling `setMay` that can be used to iteratively
 -- | mutate an existing `Option`, where mutations may occur in any order.
 -- |
-maySetOptState :: forall label option option' proxy value.
+maySetOptState ::
+  forall label option option' proxy value.
   Data.Symbol.IsSymbol label =>
   Prim.Row.Cons label value option' option =>
   proxy label ->
@@ -1271,7 +1271,6 @@ maySetOptState :: forall label option option' proxy value.
   Option option ->
   Control.Monad.State.State (Option option) Unit
 maySetOptState proxy vMay def = Control.Monad.State.put $ setMay proxy vMay def
-
 
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
