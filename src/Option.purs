@@ -1105,6 +1105,17 @@ getWithDefault default proxy option = case get proxy option of
   Data.Maybe.Just value -> value
   Data.Maybe.Nothing -> default
 
+-- | Gets a suboption of the given option, if it exists; otherwise,
+-- | returns an empty option.
+getOpt ::
+  forall label option option' proxy suboption.
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label (Option suboption) option' option =>
+  proxy label ->
+  Option option ->
+  Option suboption
+getOpt = getWithDefault empty
+
 -- | Adds a new key with the given value to an option.
 -- | The key must not already exist in the option.
 -- | If the key might already exist in the option, `set` should be used instead.
