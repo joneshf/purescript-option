@@ -63,6 +63,7 @@ clean:
 .PHONY: format
 format: node_modules
 	find $(SRC) -name '*.purs' -exec $(PURTY) --write {} \;
+	find $(TEST) -name '*.purs' -exec $(PURTY) --write {} \;
 
 node_modules: package.json
 	$(NPM) install
