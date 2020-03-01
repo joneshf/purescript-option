@@ -1109,12 +1109,12 @@ getWithDefault default proxy option = case get proxy option of
 -- | returns an empty option.
 getOpt ::
   forall label option option' proxy suboption.
-  IsSymbol label =>
-  Prim.Row.Cons label (Opt.Option suboption) option' option =>
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label (Option suboption) option' option =>
   proxy label ->
-  Opt.Option option ->
-  Opt.Option suboption
-getOpt = Opt.getWithDefault Opt.empty
+  Option option ->
+  Option suboption
+getOpt = getWithDefault empty
 
 -- | Adds a new key with the given value to an option.
 -- | The key must not already exist in the option.
