@@ -1224,10 +1224,10 @@ set ::
   value ->
   Option option' ->
   Option option
-set proxy value = modify proxy go
+set proxy value option = (alter go proxy option).option
   where
-  go :: forall a. a -> value
-  go _ = value
+  go :: forall a. a -> Data.Maybe.Maybe value
+  go _ = Data.Maybe.Just value
 
 -- | Changes a key with the given value (if it exists) to an option.
 -- | As with `set`, the key must already exist in the option.
