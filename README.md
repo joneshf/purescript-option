@@ -3,7 +3,7 @@
 A data type for optional values.
 
 ## Table of Contents
-* [Installation] (#installation)
+* [Installation](#installation)
 * [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
 * [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
 * [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
