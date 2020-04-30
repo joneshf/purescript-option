@@ -3,7 +3,7 @@
 A data type for optional values.
 
 ## Table of Contents
-
+* [Installation] (#installation)
 * [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
 * [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
 * [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
@@ -12,6 +12,52 @@ A data type for optional values.
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
 * [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
 * [Reference: `FromRecord _ _`](#reference-fromrecord-_-_)
+
+## Installation
+
+### Spago
+
+```Dhall
+-- Until this package is included in the latest package set,
+-- add the following in the `additions` part of your `packages.dhall` file.
+
+let additions =
+    { option =
+        { dependencies =
+            ["argonaut-codecs",
+            "argonaut-core",
+            "codec",
+            "codec-argonaut",
+            "either",
+            "foreign",
+            "foreign-object",
+            "lists",
+            "maybe",
+            "profunctor",
+            "prelude",
+            "record",
+            "simple-json",
+            "transformers",
+            "tuples",
+            "type-equality",
+            "unsafe-coerce"
+            ]
+        , repo = "https://github.com/joneshf/purescript-option.git"
+        , version = "988d046e460ebf7f28dc31a1ba2d46fd9552522c"
+        }
+    , codec =
+        { dependencies = ["transformers", "profunctor"]
+        , repo = "https://github.com/garyb/purescript-codec.git"
+        , version= "v3.0.0"}
+    , codec-argonaut =
+        { dependencies = ["argonaut-core", "codec", "generics-rep", "variant", "ordered-collections", "type-equality"]
+        , repo = "https://github.com/garyb/purescript-codec-argonaut.git"
+        , version = "v7.1.0"
+        }
+     -- other additional packages in your project
+    }
+
+```
 
 ## Explanation: Motivation for `Option _`
 
