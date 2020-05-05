@@ -85,6 +85,7 @@ import Data.Maybe as Data.Maybe
 import Data.Profunctor.Star as Data.Profunctor.Star
 import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
+import Debug.Trace (spy)
 import Foreign as Foreign
 import Foreign.Index as Foreign.Index
 import Foreign.Object as Foreign.Object
@@ -1789,3 +1790,6 @@ greet r =
       Data.Maybe.Nothing -> ""
   in
     greeting <> ", " <> title <> required.name
+
+testGreet :: String
+testGreet = spy "TestGreet:" (greet { name: "Sean", title: "Mr.", greeting: "Good morning" })
