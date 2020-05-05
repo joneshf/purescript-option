@@ -68,7 +68,6 @@ module Option
   ) where
 
 import Prelude
-
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
 import Control.Monad.State as Control.Monad.State
@@ -499,13 +498,12 @@ class FromRecordOption (list :: Prim.RowList.RowList) (record :: #Type) (option 
     Record record ->
     Option option
 
--- all of the recordRows kasi baka un iba wala -- zzz
 instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option where
-  -- fromRecordOption ::
-  --   forall proxy.
-  --   proxy Prim.RowList.Nil ->
-  --   Record () ->
-  --   Option option
+  fromRecordOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option
   fromRecordOption _ _ = empty
 else instance fromRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
