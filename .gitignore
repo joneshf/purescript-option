@@ -190,6 +190,7 @@ node_modules
 # Generated files
 .psci
 output
+.psc-ide-port
 
 ### SublimeText ###
 # Cache files for Sublime Text
