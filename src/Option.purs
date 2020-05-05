@@ -949,6 +949,11 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #
 
 instance toRecordOptionNil ::
   ToRecordOption Prim.RowList.Nil () () () where
+  toRecordOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Option () ->
+    Record.Builder.Builder {} {}
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
