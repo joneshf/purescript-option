@@ -33,3 +33,20 @@ spec = do
           anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
           anotherOption = Option.set (Proxy :: _ "bar") 31 someOption
         Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31
+    Test.Spec.describe "set'" do
+      Test.Spec.it "sets a value when it doesn't exist" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          someOption = Option.empty
+
+          anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          anotherOption = Option.set' { bar: 31 } someOption
+        Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31
+      Test.Spec.it "can change the type" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Boolean )
+          someOption = Option.empty
+
+          anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          anotherOption = Option.set' { bar: 31 } someOption
+        Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31

@@ -24,6 +24,7 @@ module Option
   , jsonCodec
   , modify
   , set
+  , set'
   , toRecord
   , class DecodeJsonOption
   , decodeJsonOption
@@ -47,6 +48,10 @@ module Option
   , compareOption
   , class ReadForeignOption
   , readImplOption
+  , class Set
+  , set''
+  , class SetOption
+  , setOption
   , class ShowOption
   , showOption
   , class ToRecord
@@ -837,6 +842,93 @@ else instance readForeignOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
+-- | A typeclass that sets values in an `Option _`.
+-- |
+-- | The keys must already exist in the option.
+-- | If any keys might not already exist in the option,
+-- | `insert''` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.set'' { bar: 31 } someOption
+-- | ```
+class Set (record :: #Type) (option' :: #Type) (option :: #Type) where
+  set'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance sets all values in an `Option _`.
+instance setAny ::
+  ( Prim.RowList.RowToList record list
+  , SetOption list record option' option
+  ) =>
+  Set record option' option where
+  set'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  set'' = setOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
+class SetOption (list :: Prim.RowList.RowList) (record :: #Type) (option' :: #Type) (option :: #Type) | list -> record where
+  setOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance setOptionNil ::
+  SetOption Prim.RowList.Nil () option option where
+  setOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record () ->
+    Option option ->
+    Option option
+  setOption _ _ option = option
+else instance setOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , SetOption list record' oldOption' option'
+  ) =>
+  SetOption (Prim.RowList.Cons label value list) record oldOption option where
+  setOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  setOption _ record oldOption = insert label value option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = setOption proxy record' oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value :: value
+    value = Record.get label record
+
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `List String`.
 -- | The `List String` should be processed into a single `String`.
 class ShowOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
@@ -1112,7 +1204,7 @@ delete proxy option = (alter go proxy option).option
 -- | someOption = Option.empty
 -- |
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.set (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- | anotherOption = Option.set' { bar: 31 } Option.empty
 -- | ```
 empty :: forall option. Option option
 empty = Option Foreign.Object.empty
@@ -1368,6 +1460,26 @@ set proxy value option = (alter go proxy option).option
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
 
+-- | Sets the given key/values in an option.
+-- | The key must already exist in the option.
+-- | If the key might not already exist in the option, `insert` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.set' { bar: 31 } someOption
+-- | ```
+set' ::
+  forall option option' record.
+  Set record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+set' = set''
+
 -- | Changes a key with the given value (if it exists) to an option.
 -- | As with `set`, the key must already exist in the option.
 -- |
@@ -1473,3 +1585,15 @@ user8 = toRecord user
 
 user9 :: Data.Maybe.Maybe { age :: Int, username :: String }
 user9 = getAll user
+
+user10 :: User
+user10 = set' {} user
+
+user11 :: User
+user11 = set' { age: 31 } user
+
+user12 :: User
+user12 = set' { age: 31, username: "pat" } user
+
+user13 :: Option ( username :: String, age :: Boolean )
+user13 = set' { age: true } user
