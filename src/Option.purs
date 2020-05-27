@@ -937,7 +937,7 @@ instance toRecordAny ::
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (from :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> from option record where
+class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> builder option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -945,7 +945,7 @@ class ToRecordOption (from :: #Type) (list :: Prim.RowList.RowList) (option :: #
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder { | from } { | record }
+    Record.Builder.Builder { | builder } { | record }
 
 instance toRecordOptionNil ::
   ToRecordOption () Prim.RowList.Nil () () where
@@ -961,20 +961,20 @@ else instance toRecordOptionCons ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption from list option' record'
+  , ToRecordOption builder list option' record'
   ) =>
-  ToRecordOption from (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
+  ToRecordOption builder (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder { | from } { | record }
+    Record.Builder.Builder { | builder } { | record }
   toRecordOption _ option = first <<< rest
     where
     first :: Record.Builder.Builder { | record' } { | record }
     first = Record.Builder.insert label value
 
-    rest :: Record.Builder.Builder { | from } { | record' }
+    rest :: Record.Builder.Builder { | builder } { | record' }
     rest = toRecordOption proxy option'
 
     label :: Data.Symbol.SProxy label
