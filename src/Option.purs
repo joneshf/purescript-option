@@ -927,17 +927,17 @@ class ToRecord (option :: #Type) (record :: #Type) | option -> record where
 -- | All fields in the option that exist will have the value `Just _`.
 -- | All fields in the option that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption list option () record
+  ( ToRecordOption () list option record
   , Prim.RowList.RowToList record list
   ) =>
   ToRecord option record where
   toRecord' ::
     Option option ->
     Record record
-  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: _ list) option) {}
+  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #Type) (record :: #Type) | list -> option from record where
+class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> builder option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -945,15 +945,15 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder { | from } { | record }
+    Record.Builder.Builder (Record builder) (Record record)
 
 instance toRecordOptionNil ::
-  ToRecordOption Prim.RowList.Nil () () () where
+  ToRecordOption () Prim.RowList.Nil () () where
   toRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option () ->
-    Record.Builder.Builder {} {}
+    Record.Builder.Builder (Record ()) (Record ())
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
@@ -961,30 +961,30 @@ else instance toRecordOptionCons ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption list option' from record'
+  , ToRecordOption builder list option' record'
   ) =>
-  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option from record where
+  ToRecordOption builder (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder { | from } { | record }
+    Record.Builder.Builder (Record builder) (Record record)
   toRecordOption _ option = first <<< rest
     where
-    first :: Record.Builder.Builder { | record' } { | record }
+    first :: Record.Builder.Builder (Record record') (Record record)
     first = Record.Builder.insert label value
-
-    rest :: Record.Builder.Builder { | from } { | record' }
-    rest = toRecordOption proxy option'
 
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
+    option' :: Option option'
+    option' = delete label option
+
     proxy :: Proxy list
     proxy = Proxy
 
-    option' :: Option option'
-    option' = delete label option
+    rest :: Record.Builder.Builder (Record builder) (Record record')
+    rest = toRecordOption proxy option'
 
     value :: Data.Maybe.Maybe value
     value = get label option
