@@ -934,7 +934,7 @@ instance toRecordAny ::
   toRecord' ::
     Option option ->
     Record record
-  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: _ list) option) {}
+  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
 class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #Type) (record :: #Type) | list -> option from record where
