@@ -945,7 +945,7 @@ class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder { | builder } { | record }
+    Record.Builder.Builder (Record builder) (Record record)
 
 instance toRecordOptionNil ::
   ToRecordOption () Prim.RowList.Nil () () where
@@ -953,7 +953,7 @@ instance toRecordOptionNil ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option () ->
-    Record.Builder.Builder {} {}
+    Record.Builder.Builder (Record ()) (Record ())
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
@@ -968,13 +968,13 @@ else instance toRecordOptionCons ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder { | builder } { | record }
+    Record.Builder.Builder (Record builder) (Record record)
   toRecordOption _ option = first <<< rest
     where
-    first :: Record.Builder.Builder { | record' } { | record }
+    first :: Record.Builder.Builder (Record record') (Record record)
     first = Record.Builder.insert label value
 
-    rest :: Record.Builder.Builder { | builder } { | record' }
+    rest :: Record.Builder.Builder (Record builder) (Record record')
     rest = toRecordOption proxy option'
 
     label :: Data.Symbol.SProxy label
