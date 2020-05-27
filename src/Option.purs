@@ -927,7 +927,7 @@ class ToRecord (option :: #Type) (record :: #Type) | option -> record where
 -- | All fields in the option that exist will have the value `Just _`.
 -- | All fields in the option that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption list option () record
+  ( ToRecordOption () list option record
   , Prim.RowList.RowToList record list
   ) =>
   ToRecord option record where
@@ -937,7 +937,7 @@ instance toRecordAny ::
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #Type) (record :: #Type) | list -> option from record where
+class ToRecordOption (from :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> from option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -948,7 +948,7 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (from :: #
     Record.Builder.Builder { | from } { | record }
 
 instance toRecordOptionNil ::
-  ToRecordOption Prim.RowList.Nil () () () where
+  ToRecordOption () Prim.RowList.Nil () () where
   toRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
@@ -961,9 +961,9 @@ else instance toRecordOptionCons ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption list option' from record'
+  , ToRecordOption from list option' record'
   ) =>
-  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option from record where
+  ToRecordOption from (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
