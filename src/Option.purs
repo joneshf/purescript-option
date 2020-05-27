@@ -65,7 +65,6 @@ module Option
 import Prelude
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
-import Control.Monad.State as Control.Monad.State
 import Control.Monad.Writer as Control.Monad.Writer
 import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
@@ -892,6 +891,47 @@ instance setOptionNil ::
     Option option ->
     Option option
   setOption _ _ option = option
+else instance setOptionConsMaybe ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , SetOption list record' oldOption' option'
+  ) =>
+  SetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record oldOption option where
+  setOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  setOption _ record oldOption = case value' of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> case get label oldOption of
+      Data.Maybe.Just value -> insert label value option
+      Data.Maybe.Nothing -> case option of
+        Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = setOption proxy record' oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value' :: Data.Maybe.Maybe value
+    value' = Record.get label record
 else instance setOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value record' record
@@ -1480,49 +1520,6 @@ set' ::
   Option option
 set' = set''
 
--- | Changes a key with the given value (if it exists) to an option.
--- | As with `set`, the key must already exist in the option.
--- |
--- | E.g.
--- | ```PureScript
--- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | someOption = Option.empty
--- |
--- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.setMay (Data.Symbol.SProxy :: _ "bar") (Just 31 someOption
--- | ```
--- |
--- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
--- |
--- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
-setMay ::
-  forall label option option' proxy value.
-  Data.Symbol.IsSymbol label =>
-  Prim.Row.Cons label value option' option =>
-  proxy label ->
-  Data.Maybe.Maybe value ->
-  Option option ->
-  Option option
-setMay proxy vMay def = modify proxy go def
-  where
-  go :: value -> value
-  go optVal = case vMay of
-    Data.Maybe.Just v -> v
-    Data.Maybe.Nothing -> optVal
-
--- | A convenience function calling `setMay` that can be used to iteratively
--- | mutate an existing `Option`, where mutations may occur in any order.
--- |
-maySetOptState ::
-  forall label option option' proxy value.
-  Data.Symbol.IsSymbol label =>
-  Prim.Row.Cons label value option' option =>
-  proxy label ->
-  Data.Maybe.Maybe value ->
-  Option option ->
-  Control.Monad.State.State (Option option) Unit
-maySetOptState proxy vMay def = Control.Monad.State.put $ setMay proxy vMay def
-
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
 -- | E.g.
@@ -1597,3 +1594,9 @@ user12 = set' { age: 31, username: "pat" } user
 
 user13 :: Option ( username :: String, age :: Boolean )
 user13 = set' { age: true } user
+
+user14 :: User
+user14 = set' { age: Data.Maybe.Just 31 } user
+
+user15 :: User
+user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
