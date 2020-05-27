@@ -974,17 +974,17 @@ else instance toRecordOptionCons ::
     first :: Record.Builder.Builder (Record record') (Record record)
     first = Record.Builder.insert label value
 
-    rest :: Record.Builder.Builder (Record builder) (Record record')
-    rest = toRecordOption proxy option'
-
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
+
+    option' :: Option option'
+    option' = delete label option
 
     proxy :: Proxy list
     proxy = Proxy
 
-    option' :: Option option'
-    option' = delete label option
+    rest :: Record.Builder.Builder (Record builder) (Record record')
+    rest = toRecordOption proxy option'
 
     value :: Data.Maybe.Maybe value
     value = get label option
