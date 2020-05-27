@@ -21,9 +21,11 @@ module Option
   , getAll
   , getWithDefault
   , insert
+  , insert'
   , jsonCodec
   , modify
   , set
+  , set'
   , toRecord
   , class DecodeJsonOption
   , decodeJsonOption
@@ -39,6 +41,10 @@ module Option
   , getAll'
   , class GetAllOption
   , getAllOption
+  , class Insert
+  , insert''
+  , class InsertOption
+  , insertOption
   , class JsonCodec
   , jsonCodec'
   , class JsonCodecOption
@@ -47,6 +53,10 @@ module Option
   , compareOption
   , class ReadForeignOption
   , readImplOption
+  , class Set
+  , set''
+  , class SetOption
+  , setOption
   , class ShowOption
   , showOption
   , class ToRecord
@@ -60,7 +70,6 @@ module Option
 import Prelude
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
-import Control.Monad.State as Control.Monad.State
 import Control.Monad.Writer as Control.Monad.Writer
 import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
@@ -578,6 +587,122 @@ else instance getAllOptionCons ::
     value' :: Data.Maybe.Maybe value
     value' = get label option
 
+-- | A typeclass that inserts values in an `Option _`.
+-- |
+-- | The keys must not already exist in the option.
+-- | If any keys might already exist in the option,
+-- | `set''` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.insert'' { bar: 31 } someOption
+-- | ```
+class Insert (record :: #Type) (option' :: #Type) (option :: #Type) where
+  insert'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance inserts all values in an `Option _`.
+instance insertAny ::
+  ( Prim.RowList.RowToList record list
+  , InsertOption list record option' option
+  ) =>
+  Insert record option' option where
+  insert'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  insert'' = insertOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` inserting values in an `Option _`.
+class InsertOption (list :: Prim.RowList.RowList) (record :: #Type) (option' :: #Type) (option :: #Type) | list -> record where
+  insertOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance insertOptionNil ::
+  InsertOption Prim.RowList.Nil () option option where
+  insertOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record () ->
+    Option option ->
+    Option option
+  insertOption _ _ option = option
+else instance insertOptionConsMaybe ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , InsertOption list record' oldOption option'
+  ) =>
+  InsertOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record oldOption option where
+  insertOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  insertOption _ record oldOption = case value' of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> case option of
+      Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option :: Option option'
+    option = insertOption proxy record' oldOption
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value' :: Data.Maybe.Maybe value
+    value' = Record.get label record
+else instance insertOptionConsValue ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , InsertOption list record' oldOption option'
+  ) =>
+  InsertOption (Prim.RowList.Cons label value list) record oldOption option where
+  insertOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  insertOption _ record oldOption = insert label value option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option :: Option option'
+    option = insertOption proxy record' oldOption
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value :: value
+    value = Record.get label record
+
 -- | A typeclass that converts a record of `JsonCodec`s into a `JsonCodec` for an option.
 -- |
 -- | This is useful to provide a straight-forward `JsonCodec` for an `Option _`.
@@ -836,6 +961,134 @@ else instance readForeignOptionCons ::
 
     proxy :: Proxy list
     proxy = Proxy
+
+-- | A typeclass that sets values in an `Option _`.
+-- |
+-- | The keys must already exist in the option.
+-- | If any keys might not already exist in the option,
+-- | `insert''` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.set'' { bar: 31 } someOption
+-- | ```
+class Set (record :: #Type) (option' :: #Type) (option :: #Type) where
+  set'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance sets all values in an `Option _`.
+instance setAny ::
+  ( Prim.RowList.RowToList record list
+  , SetOption list record option' option
+  ) =>
+  Set record option' option where
+  set'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  set'' = setOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
+class SetOption (list :: Prim.RowList.RowList) (record :: #Type) (option' :: #Type) (option :: #Type) | list -> record where
+  setOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance setOptionNil ::
+  SetOption Prim.RowList.Nil () option option where
+  setOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record () ->
+    Option option ->
+    Option option
+  setOption _ _ option = option
+else instance setOptionConsMaybe ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , SetOption list record' oldOption' option'
+  ) =>
+  SetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record oldOption option where
+  setOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  setOption _ record oldOption = case value' of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> case get label oldOption of
+      Data.Maybe.Just value -> insert label value option
+      Data.Maybe.Nothing -> case option of
+        Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = setOption proxy record' oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value' :: Data.Maybe.Maybe value
+    value' = Record.get label record
+else instance setOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  , Prim.Row.Lacks label record'
+  , SetOption list record' oldOption' option'
+  ) =>
+  SetOption (Prim.RowList.Cons label value list) record oldOption option where
+  setOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  setOption _ record oldOption = insert label value option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = setOption proxy record' oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record' :: Record record'
+    record' = Record.delete label record
+
+    value :: value
+    value = Record.get label record
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `List String`.
 -- | The `List String` should be processed into a single `String`.
@@ -1112,7 +1365,7 @@ delete proxy option = (alter go proxy option).option
 -- | someOption = Option.empty
 -- |
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.set (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- | anotherOption = Option.set' { bar: 31 } Option.empty
 -- | ```
 empty :: forall option. Option option
 empty = Option Foreign.Object.empty
@@ -1274,6 +1527,14 @@ insert proxy value option = (alter go proxy option).option
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
 
+insert' ::
+  forall option option' record.
+  Insert record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+insert' = insert''
+
 -- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
 -- |
 -- | The `String` is used in errors when decoding fails.
@@ -1368,8 +1629,9 @@ set proxy value option = (alter go proxy option).option
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
 
--- | Changes a key with the given value (if it exists) to an option.
--- | As with `set`, the key must already exist in the option.
+-- | Sets the given key/values in an option.
+-- | The key must already exist in the option.
+-- | If the key might not already exist in the option, `insert` should be used instead.
 -- |
 -- | E.g.
 -- | ```PureScript
@@ -1377,39 +1639,15 @@ set proxy value option = (alter go proxy option).option
 -- | someOption = Option.empty
 -- |
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.setMay (Data.Symbol.SProxy :: _ "bar") (Just 31 someOption
+-- | anotherOption = Option.set' { bar: 31 } someOption
 -- | ```
--- |
--- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
--- |
--- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
-setMay ::
-  forall label option option' proxy value.
-  Data.Symbol.IsSymbol label =>
-  Prim.Row.Cons label value option' option =>
-  proxy label ->
-  Data.Maybe.Maybe value ->
-  Option option ->
+set' ::
+  forall option option' record.
+  Set record option' option =>
+  Record record ->
+  Option option' ->
   Option option
-setMay proxy vMay def = modify proxy go def
-  where
-  go :: value -> value
-  go optVal = case vMay of
-    Data.Maybe.Just v -> v
-    Data.Maybe.Nothing -> optVal
-
--- | A convenience function calling `setMay` that can be used to iteratively
--- | mutate an existing `Option`, where mutations may occur in any order.
--- |
-maySetOptState ::
-  forall label option option' proxy value.
-  Data.Symbol.IsSymbol label =>
-  Prim.Row.Cons label value option' option =>
-  proxy label ->
-  Data.Maybe.Maybe value ->
-  Option option ->
-  Control.Monad.State.State (Option option) Unit
-maySetOptState proxy vMay def = Control.Monad.State.put $ setMay proxy vMay def
+set' = set''
 
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
@@ -1473,3 +1711,21 @@ user8 = toRecord user
 
 user9 :: Data.Maybe.Maybe { age :: Int, username :: String }
 user9 = getAll user
+
+user10 :: User
+user10 = set' {} user
+
+user11 :: User
+user11 = set' { age: 31 } user
+
+user12 :: User
+user12 = set' { age: 31, username: "pat" } user
+
+user13 :: Option ( username :: String, age :: Boolean )
+user13 = set' { age: true } user
+
+user14 :: User
+user14 = set' { age: Data.Maybe.Just 31 } user
+
+user15 :: User
+user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
