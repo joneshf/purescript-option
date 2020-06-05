@@ -14,6 +14,7 @@
 -- | Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
 module Option
   ( Option
+  , fromOption
   , fromRecord
   , delete
   , empty
@@ -33,6 +34,10 @@ module Option
   , encodeJsonOption
   , class EqOption
   , eqOption
+  , class FromOption
+  , fromOption'
+  , class FromOptionFold
+  , fromOptionFold
   , class FromRecord
   , fromRecord'
   , class FromRecordOption
@@ -383,6 +388,88 @@ else instance eqOptionCons ::
 
     rightValue :: Data.Maybe.Maybe value
     rightValue = get label right'
+
+-- | A typeclass for converting an `Option row` into a `Record subRow` with default values from a `Record subRow`, where `subRow` ⊆ `row`.
+-- |
+-- | This simplifies the workflow to supply default value for each potentially non-exist field fetched by `get`/`getWithDefault`/`toRecord` and then to collect them into a `Record`.
+-- |
+-- | E.g. Someone can say:
+-- | ```PureScript
+-- | Option.fromOption' someOption { foo: true, bar: "hi" }
+-- | ```
+-- | Instead of having to say:
+-- | ```PureScript
+-- | { foo: Option.getWithDefault true (Data.Symbol.SProxy :: _ "foo") someOption
+-- | , bar: Option.getWithDefault "hi" (Data.Symbol.SProxy :: _ "bar") someOption
+-- | }
+-- | ```
+class FromOption (row :: #Type) (subRow :: #Type) where
+  fromOption' ::
+    Option row ->
+    Record subRow ->
+    Record subRow
+
+instance fromOptionInit ::
+  -- subRow -> list
+  ( Prim.RowList.RowToList subRow list
+  -- fromOptionFold, to = subRow
+  , FromOptionFold list row subRow subRow
+  ) =>
+  FromOption row subRow where
+  fromOption' option defaults = Record.Builder.build builder {}
+    where
+    builder :: Record.Builder.Builder {} (Record subRow)
+    builder =
+      fromOptionFold
+        (Proxy :: Proxy list)
+        option
+        defaults
+
+-- | A typeclass that iterates a `RowList` converting an `Option row` and a `Record subRow` into an `Record.Builder {} (Record to)`, where `to` depends on `list`.
+class FromOptionFold (list :: Prim.RowList.RowList) (row :: #Type) (subRow :: #Type) (to :: #Type) | list -> to where
+  fromOptionFold ::
+    forall proxy.
+    proxy list ->
+    Option row ->
+    Record subRow ->
+    Record.Builder.Builder {} (Record to)
+
+instance fromOptionFoldNil ::
+  FromOptionFold Prim.RowList.Nil row subRow () where
+  fromOptionFold _ _ _ = identity
+
+instance fromOptionFoldCons ::
+  -- recursive call to fromOptionFold
+  ( FromOptionFold restRL row subRow to0
+  -- Option.getWithDefault from (Option row)
+  , Prim.Row.Cons label value _0 row
+  -- Record.get from (Record subRow)
+  , Prim.Row.Cons label value _1 subRow
+  -- Record.Builder.insert
+  , Prim.Row.Cons label value to0 to
+  , Prim.Row.Lacks label to0
+  , Data.Symbol.IsSymbol label
+  ) =>
+  FromOptionFold (Prim.RowList.Cons label value restRL) row subRow to where
+  fromOptionFold _ option defaults = this <<< rest
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    this :: Record.Builder.Builder (Record to0) (Record to)
+    this =
+      let
+        value :: value
+        value = getWithDefault (Record.get label defaults) label option
+      in
+        Record.Builder.insert label value
+
+    rest :: Record.Builder.Builder {} (Record to0)
+    rest =
+      fromOptionFold
+        (Proxy :: Proxy restRL)
+        option
+        defaults
 
 -- | A typeclass for converting a `Record _` into an `Option _`.
 -- |
@@ -1370,6 +1457,17 @@ delete proxy option = (alter go proxy option).option
 empty :: forall option. Option option
 empty = Option Foreign.Object.empty
 
+-- | Converts an `Option row` into a `Record subRow` with default values from a `Record subRow`, where `subRow` ⊆ `row`.
+-- |
+-- | This is an alias for `fromOption'` so the documentation is a bit clearer.
+fromOption ::
+  forall row subRow.
+  FromOption row subRow =>
+  Option row ->
+  Record subRow ->
+  Record subRow
+fromOption = fromOption'
+
 -- | The given `Record record` must have no more fields than the expected `Option _`.
 -- |
 -- | E.g. The following definitions are valid.
@@ -1729,3 +1827,11 @@ user14 = set' { age: Data.Maybe.Just 31 } user
 
 user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
+
+user16 :: { age :: Int, username :: String }
+user16 =
+  fromOption
+    user
+    { age: 0
+    , username: ""
+    }
