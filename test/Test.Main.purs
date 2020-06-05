@@ -66,3 +66,39 @@ spec = do
           anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
           anotherOption = Option.set' { bar: Data.Maybe.Nothing } someOption
         Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31
+
+    Test.Spec.describe "fromOption" do
+      Test.Spec.it "provides default value if it doesn't exist" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          someOption = Option.fromRecord { foo: true }
+
+          defaults :: { bar :: Int }
+          defaults = { bar: 0 }
+
+          expected :: { bar :: Int }
+          expected = defaults
+
+          actual :: { bar :: Int }
+          actual = Option.fromOption someOption defaults
+
+        actual `Test.Spec.Assert.shouldEqual` expected
+
+      Test.Spec.it "uses original value if it exists" do
+        let
+          original :: { foo :: Boolean }
+          original = { foo: true }
+
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          someOption = Option.fromRecord original
+
+          defaults :: { foo :: Boolean }
+          defaults = { foo: false }
+
+          expected :: { foo :: Boolean }
+          expected = original
+
+          actual :: { foo :: Boolean }
+          actual = Option.fromOption someOption defaults
+
+        actual `Test.Spec.Assert.shouldEqual` expected
