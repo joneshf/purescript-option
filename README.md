@@ -4,14 +4,14 @@ A data type for optional values.
 
 ## Table of Contents
 
-* [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
-* [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
-* [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
-* [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
-* [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
-* [Reference: `FromRecord _ _`](#reference-fromrecord-_-_)
+- [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
+- [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
+- [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
+- [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
+- [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
+- [Reference: `FromRecord _ _`](#reference-fromrecord-_-_)
 
 ## Explanation: Motivation for `Option _`
 
@@ -70,6 +70,7 @@ With the `greeting` function, we can pass in an option and alter the behavior:
 We've allowed people to override the behavior of the function with optional values!
 
 It might be instructive to compare how we might write a similar function using a `Record _` instead of `Option _`:
+
 ```PureScript
 greeting' ::
   Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ) ->
@@ -91,6 +92,7 @@ To implement `greeting'`, nothing really changed.
 We used the built-in dot operator to fetch the keys out of the record, but we could have just as easily used `Record.get` (which would have highlighted the similarlities even more).
 
 To use `greeting'`, we force the users of `greeting'` to do always give us a value in the record:
+
 ```PureScript
 > User.greeting' { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing }
 "Hello, World"
@@ -168,7 +170,7 @@ Using `purescript-argonaut`, `Option _` can help with that idea:
 ```PureScript
 decode ::
   Data.Argonaut.Core.Json ->
-  Data.Either.Either String (Option.Option ( name :: String, title :: String ))
+  Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option.Option ( name :: String, title :: String ))
 decode = Data.Argonaut.Decode.Class.decodeJson
 
 encode ::
@@ -178,17 +180,18 @@ encode = Data.Argonaut.Encode.Class.encodeJson
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
-> decode =<< Data.Argonaut.Parser.jsonParser """{}"""
+> decode =<< Data.Argonaut.Decode.Parser.parseJson """{}"""
 (Right (Option.fromRecord {}))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
+> decode =<< Data.Argonaut.Decode.Parser.parseJson """{"title": "wonderful"}"""
 (Right (Option.fromRecord { title: "wonderful" }))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
+> decode =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat"}"""
 (Right (Option.fromRecord { name: "Pat" }))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> decode =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.fromRecord { name: "Pat", title: "Dr." }))
 ```
 
@@ -217,7 +220,7 @@ If we attempt to go directly to `Record ( name :: Data.Maybe.Maybe String, title
 ```PureScript
 decode' ::
   Data.Argonaut.Core.Json ->
-  Data.Either.Either String (Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ))
+  Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeErorr (Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ))
 decode' = Data.Argonaut.Decode.Class.decodeJson
 
 encode' ::
@@ -229,16 +232,16 @@ encode' = Data.Argonaut.Encode.Class.encodeJson
 We won't get the behavior we expect:
 
 ```PureScript
-> decode' =<< Data.Argonaut.Parser.jsonParser """{}"""
-(Left "JSON was missing expected field: title")
+> decode' =<< Data.Argonaut.Decode.Parser.parseJson """{}"""
+(Left (AtKey "title" MissingValue))
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
-(Left "JSON was missing expected field: name")
+> decode' =<< Data.Argonaut.Decode.Parser.parseJson """{"title": "wonderful"}"""
+(Left (AtKey "name" MissingValue))
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
-(Left "JSON was missing expected field: title")
+> decode' =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat"}"""
+(Left (AtKey "title" MissingValue))
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> decode' =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat", "title": "Dr."}"""
 (Right { name: (Just "Pat"), title: (Just "Dr.") })
 
 > Data.Argonaut.Core.stringify (encode' { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing })
@@ -258,6 +261,7 @@ Unless both fields exist, we cannot decode the JSON object.
 Similarly, no matter what the values are, we always encode them into a JSON object.
 
 In order to emulate the behavior of an optional field, we have to name the record, and write our own instances:
+
 ```PureScript
 newtype Greeting
   = Greeting
@@ -292,16 +296,16 @@ instance encodeJsonGreeting :: Data.Argonaut.Encode.Class.EncodeJson Greeting wh
 If we try decoding and encoding now, we get something closer to what we wanted:
 
 ```PureScript
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{}""" :: Data.Either.Either String Greeting
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Decode.Parser.parseJson """{}""" :: Data.Either.Either Data.Argonaut.Error.JsonDecodeError Greeting
 (Right (Greeting { name: Nothing, title: Nothing }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}""" :: Data.Either.Either String Greeting
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Decode.Parser.parseJson """{"title": "wonderful"}""" :: Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError Greeting
 (Right (Greeting { name: Nothing, title: (Just "wonderful") }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}""" :: Data.Either.Either String Greeting
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat"}""" :: Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError Greeting
 (Right (Greeting { name: (Just "Pat"), title: Nothing }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}""" :: Data.Either.Either String Greeting
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Decode.Parser.parseJson """{"name": "Pat", "title": "Dr."}""" :: Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError Greeting
 (Right (Greeting { name: (Just "Pat"), title: (Just "Dr.") }))
 
 > Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing }))
@@ -658,6 +662,7 @@ writeJSON = Simple.JSON.writeJSON
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
 > readJSON """{}"""
 (Right (Option.fromRecord {}))
@@ -745,6 +750,7 @@ For instance, constructing a `Data.DateTime.DateTime` can be done by passing in 
 The issue is, how do we construct a `Data.Date.Date` or `Data.Time.Time`.
 
 One way to get construct these values is to use the `Data.Enum.Enum` instance for both of them:
+
 ```PureScript
 > Data.DateTime.DateTime bottom bottom
 (DateTime (Date (Year -271820) January (Day 1)) (Time (Hour 0) (Minute 0) (Second 0) (Millisecond 0)))
@@ -888,10 +894,13 @@ E.g. `FromRecord () ( name :: String )` says that the `Option ( name :: String )
 Since there is syntax for creating records, but no syntax for creating options, this typeclass can be useful for providing an easier to use interface to options.
 
 E.g. Someone can say:
+
 ```PureScript
 Option.fromRecord' { foo: true, bar: 31 }
 ```
+
 Instead of having to say:
+
 ```PureScript
 Option.insert
   (Data.Symbol.SProxy :: _ "foo")
