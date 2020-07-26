@@ -72,7 +72,6 @@ module Option
 import Prelude
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
-import Control.Monad.State as Control.Monad.State
 import Control.Monad.Writer as Control.Monad.Writer
 import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
@@ -87,6 +86,7 @@ import Data.Maybe as Data.Maybe
 import Data.Profunctor.Star as Data.Profunctor.Star
 import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
+import Debug.Trace (spy)
 import Foreign as Foreign
 import Foreign.Index as Foreign.Index
 import Foreign.Object as Foreign.Object
@@ -1773,6 +1773,7 @@ user14 = set' { age: Data.Maybe.Just 31 } user
 
 user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
+
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecord { title: "Mr.", name: "" }
 
@@ -1786,7 +1787,7 @@ greet r =
 
     greeting = Data.Maybe.fromMaybe "Hi" (get (Data.Symbol.SProxy :: _ "greeting") optional)
 
-    title = case (get (Data.Symbol.SProxy :: _ "title") optional) of
+    title = case get (Data.Symbol.SProxy :: _ "title") optional of
       Data.Maybe.Just v -> v <> " "
       Data.Maybe.Nothing -> ""
   in
