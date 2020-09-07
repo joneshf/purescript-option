@@ -60,9 +60,9 @@ spec = do
         Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31
       Test.Spec.it "`Data.Maybe.Nothing` keeps the previous value" do
         let
-          someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+          someOption :: { optional :: Option.Option ( foo :: Boolean, bar :: Int ), required :: {} }
           someOption = Option.fromRecord { bar: 31 }
 
           anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
-          anotherOption = Option.set' { bar: Data.Maybe.Nothing } someOption
+          anotherOption = Option.set' { bar: Data.Maybe.Nothing } someOption.optional
         Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assert.shouldEqual` Data.Maybe.Just 31
