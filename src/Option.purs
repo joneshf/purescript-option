@@ -447,7 +447,12 @@ instance fromRecordAny ::
   , Prim.RowList.RowToList required requiredList
   ) =>
   FromRecord record required optional where
-  --  fromRecord' :: Record record -> Option option
+  fromRecord' ::
+    Record record ->
+    Record
+      ( optional :: Option optional
+      , required :: Record required
+      )
   fromRecord' record =
     { optional: fromRecordOption (Proxy :: Proxy optionalList) record
     , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
@@ -461,6 +466,11 @@ class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (from 
     Record.Builder.Builder { | from } { | required }
 
 instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () () where
+  fromRecordRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record ())
   fromRecordRequired _ _ = identity
 
 instance fromRecordRequiredCons ::
@@ -471,6 +481,11 @@ instance fromRecordRequiredCons ::
   , Prim.Row.Lacks label mid
   ) =>
   FromRecordRequired (Prim.RowList.Cons label value list) recordRows from to where
+  fromRecordRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record recordRows ->
+    Record.Builder.Builder (Record from) (Record to)
   fromRecordRequired _ record = first <<< rest
     where
     first :: Record.Builder.Builder { | mid } { | to }
