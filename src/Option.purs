@@ -410,7 +410,7 @@ else instance eqOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class FromRecord (record :: #Type) (required :: #Type) (option :: #Type) | record -> option required where
+class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
   -- | The given `Record record` must have no more fields than the expected `Option _`.
   -- |
   -- | E.g. The following definitions are valid.
@@ -432,7 +432,7 @@ class FromRecord (record :: #Type) (required :: #Type) (option :: #Type) | recor
   -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
   -- | option4 = Option.fromRecord' { qux: [] }
   -- | ```
-  fromRecord' :: Record record -> { optional :: Option option, required :: { | required } }
+  fromRecord' :: Record record -> { optional :: Option optional, required :: { | required } }
 
 -- | This instance converts a record into an option.
 -- |
@@ -440,13 +440,13 @@ class FromRecord (record :: #Type) (required :: #Type) (option :: #Type) | recor
 -- |
 -- | Any fields in the expected option that do not exist in the record are not added.
 instance fromRecordAny ::
-  ( FromRecordOption optionalList record option
+  ( FromRecordOption optionalList record optional
   , FromRecordRequired requiredList record () required
   , Prim.RowList.RowToList optionalRowsForLookup optionalList
   , Prim.Row.Union required optionalRowsForLookup record -- givenRecordRows - requiredRows = optionalRowsForLookup
   , Prim.RowList.RowToList required requiredList
   ) =>
-  FromRecord record required option where
+  FromRecord record required optional where
   --  fromRecord' :: Record record -> Option option
   fromRecord' record =
     { optional: fromRecordOption (Proxy :: Proxy optionalList) record
