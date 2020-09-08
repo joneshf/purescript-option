@@ -484,8 +484,8 @@ class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
 instance fromRecordAny ::
   ( FromRecordOption optionalList record optional
   , FromRecordRequired requiredList record required
-  , Prim.RowList.RowToList optionalRowsForLookup optionalList
-  , Prim.Row.Union required optionalRowsForLookup record -- givenRecordRows - requiredRows = optionalRowsForLookup
+  , Prim.Row.Union required optional' record
+  , Prim.RowList.RowToList optional' optionalList
   , Prim.RowList.RowToList required requiredList
   ) =>
   FromRecord record required optional where
@@ -520,26 +520,26 @@ instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () 
   fromRecordRequired _ _ = identity
 else instance fromRecordRequiredCons ::
   ( Data.Symbol.IsSymbol label
-  , FromRecordRequired list recordRows mid
-  , Prim.Row.Cons label value trash_ recordRows
-  , Prim.Row.Cons label value mid to
-  , Prim.Row.Lacks label mid
+  , FromRecordRequired list record required'
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Lacks label required'
   ) =>
-  FromRecordRequired (Prim.RowList.Cons label value list) recordRows to where
+  FromRecordRequired (Prim.RowList.Cons label value list) record required where
   fromRecordRequired ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record recordRows ->
-    Record.Builder.Builder (Record ()) (Record to)
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record required)
   fromRecordRequired _ record = first <<< rest
     where
-    first :: Record.Builder.Builder (Record mid) (Record to)
+    first :: Record.Builder.Builder (Record required') (Record required)
     first = Record.Builder.insert label value
 
     value :: value
     value = Record.get label record
 
-    rest :: Record.Builder.Builder (Record ()) (Record mid)
+    rest :: Record.Builder.Builder (Record ()) (Record required')
     rest = fromRecordRequired proxy record
 
     proxy :: Proxy list
