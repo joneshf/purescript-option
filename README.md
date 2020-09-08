@@ -11,7 +11,7 @@ A data type for optional values.
 * [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
 * [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
-* [Reference: `FromRecord _ _`](#reference-fromrecord-_-_)
+* [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
 ## Explanation: Motivation for `Option _`
 
@@ -117,7 +117,7 @@ The implementation moves the work of constructing the `Option _`, but should als
 ```PureScript
 greeting ::
   forall record.
-  Option.FromRecord record ( name :: String, title :: String ) =>
+  Option.FromRecord record () ( name :: String, title :: String ) =>
   Record record ->
   String
 greeting record = "Hello, " <> title' <> name'
@@ -878,12 +878,15 @@ And, we can alter any of the components:
 (DateTime (Date (Year 2019) April (Day 1)) (Time (Hour 0) (Minute 30) (Second 0) (Millisecond 0)))
 ```
 
-## Reference: `FromRecord _ _`
+## Reference: `FromRecord _ _ _`
 
 A typeclass for converting a `Record _` into an `Option _`.
 
-An instance `FromRecord record option` states that we can make an `Option option` from a `Record record` where every field present in the record is present in the option.
-E.g. `FromRecord () ( name :: String )` says that the `Option ( name :: String )` will have no value; and `FromRecord ( name :: String ) ( name :: String )` says that the `Option ( name :: String )` will have the given `name` value.
+An instance `FromRecord record required optional` states that we can make a `Record required` and an `Option optional` from a `Record record` where every required field is in the record and the rest of the present fields in the record is present in the option.
+E.g. `FromRecord () () ( name :: String )` says that the `Record ()` has no fields and the `Option ( name :: String )` will have no value;
+`FromRecord ( name :: String ) () ( name :: String )` says that the `Record ()` has no fields and the `Option ( name :: String )` will have the given `name` value;
+`FromRecord ( name :: String ) ( name :: String ) ()` says that the `Record ( name :: String )` has the given `name` value and the `Option ()` will have no value;
+`FromRecord () ( name :: String) ()` is a type error since the `name` field is required but the given record lacks the field.
 
 Since there is syntax for creating records, but no syntax for creating options, this typeclass can be useful for providing an easier to use interface to options.
 
