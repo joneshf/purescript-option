@@ -15,6 +15,7 @@
 module Option
   ( Option
   , fromRecord
+  , fromRecordWithRequired
   , delete
   , empty
   , get
@@ -1454,9 +1455,77 @@ empty = Option Foreign.Object.empty
 -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | option4 = Option.fromRecord { qux: [] }
 -- | ```
+fromRecord ::
+  forall option record.
+  FromRecord record () option =>
+  Record record ->
+  Option option
+fromRecord record = result.optional
+  where
+  result ::
+    Record
+      ( optional :: Option option
+      , required :: Record ()
+      )
+  result = fromRecord' record
+
+-- | The given `Record record` must have no more fields than expected.
+-- |
+-- | E.g. The following definitions are valid.
+-- | ```PureScript
+-- | option1 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option1 = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | option2 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option2 = Option.fromRecord {}
+-- |
+-- | option3 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( bar :: Int )
+-- |     , required :: Record ( foo :: Boolean )
+-- |     )
+-- | option3 = Option.fromRecord { foo: true }
+-- | ```
+-- |
+-- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
+-- | ```PureScript
+-- | -- This will not work as it has the extra field `baz`
+-- | option3 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option3 = Option.fromRecord { foo: true, bar: 31, baz: "hi" }
+-- |
+-- | -- This will not work as it has the extra field `qux`
+-- | option4 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option4 = Option.fromRecord { qux: [] }
+-- | ```
+-- |
+-- | And, this definition is not valid as the given record lacks the required fields.
+-- | ```PureScript
+-- | option5 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ( baz :: String )
+-- |     )
+-- | option5 = Option.fromRecord { foo: true, bar: 31 }
+-- | ```
 -- |
 -- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
-fromRecord ::
+fromRecordWithRequired ::
   forall option required record.
   FromRecord record required option =>
   Record record ->
@@ -1464,7 +1533,7 @@ fromRecord ::
     ( optional :: Option option
     , required :: Record required
     )
-fromRecord = fromRecord'
+fromRecordWithRequired = fromRecord'
 
 -- | Attempts to fetch the value at the given key from an option.
 -- |
@@ -1766,10 +1835,10 @@ user4 = delete (Data.Symbol.SProxy :: _ "age") user
 user5 :: Option ( username :: String, age :: Boolean )
 user5 = modify (Data.Symbol.SProxy :: _ "age") (\_ -> true) user
 
-user6 :: { optional :: User, required :: {} }
+user6 :: User
 user6 = fromRecord {}
 
-user7 :: { optional :: User, required :: {} }
+user7 :: User
 user7 = fromRecord { age: 10 }
 
 user8 :: { age :: Data.Maybe.Maybe Int, username :: Data.Maybe.Maybe String }
@@ -1797,4 +1866,4 @@ user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
-testing = fromRecord { title: "Mr.", name: "" }
+testing = fromRecordWithRequired { title: "Mr.", name: "" }
