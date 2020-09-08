@@ -1775,19 +1775,3 @@ user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecord { title: "Mr.", name: "" }
-
-greet ::
-  forall record.
-  FromRecord record ( name :: String ) ( title :: String, greeting :: String ) =>
-  { | record } -> String
-greet r =
-  let
-    { required, optional } = fromRecord r
-
-    greeting = Data.Maybe.fromMaybe "Hi" (get (Data.Symbol.SProxy :: _ "greeting") optional)
-
-    title = case get (Data.Symbol.SProxy :: _ "title") optional of
-      Data.Maybe.Just v -> v <> " "
-      Data.Maybe.Nothing -> ""
-  in
-    greeting <> ", " <> title <> required.name

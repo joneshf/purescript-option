@@ -24,6 +24,27 @@ reporters =
 spec :: Test.Spec.Spec Unit
 spec = do
   Test.Spec.describe "Option" do
+    Test.Spec.describe "fromRecord" do
+      Test.Spec.it "requires correct fields" do
+        let
+          option ::
+            Record
+              ( optional ::
+                Option.Option
+                  ( greeting :: String
+                  , title :: String
+                  )
+              , required ::
+                Record
+                  ( name :: String
+                  )
+              )
+          option =
+            Option.fromRecord
+              { name: "Pat"
+              }
+        option.required `Test.Spec.Assert.shouldEqual` { name: "Pat" }
+        option.optional `Test.Spec.Assert.shouldEqual` Option.empty
     Test.Spec.describe "set" do
       Test.Spec.it "sets a value when it doesn't exist" do
         let
