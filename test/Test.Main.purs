@@ -30,14 +30,14 @@ spec = do
           option ::
             Record
               ( optional ::
-                Option.Option
-                  ( greeting :: String
-                  , title :: String
-                  )
+                  Option.Option
+                    ( greeting :: String
+                    , title :: String
+                    )
               , required ::
-                Record
-                  ( name :: String
-                  )
+                  Record
+                    ( name :: String
+                    )
               )
           option =
             Option.fromRecordWithRequired

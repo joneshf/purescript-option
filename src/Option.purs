@@ -100,7 +100,7 @@ import Unsafe.Coerce as Unsafe.Coerce
 
 -- | A collection of key/value pairs where any key and value may or may not exist.
 -- | E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
-newtype Option (row :: #Type)
+newtype Option (row :: # Type)
   = Option (Foreign.Object.Object (forall a. a))
 
 -- A local proxy for `Prim.RowList.RowList` so as not to impose a hard requirement on `Type.Data.RowList.RLProxy` in the typeclasses we define.
@@ -216,7 +216,7 @@ instance writeForeignOptionOption ::
   writeImpl = writeForeignOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `RowList` decoding an `Object Json` to an `Option _`.
-class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -268,7 +268,7 @@ else instance decodeJsonOptionCons ::
     proxy = Proxy
 
 -- | A typeclass that iterates a `RowList` encoding an `Option _` as `Json`.
-class EncodeJsonOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class EncodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -328,7 +328,7 @@ else instance encodeJsonOptionCons ::
     value' = get label option
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
-class EqOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class EqOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -414,7 +414,7 @@ else instance eqOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
+class FromRecord (record :: # Type) (required :: # Type) (optional :: # Type) where
   -- | The given `Record record` must have no more fields than expected.
   -- |
   -- | E.g. The following definitions are valid.
@@ -501,7 +501,7 @@ instance fromRecordAny ::
     }
 
 -- | A typeclass that iterates a `RowList` converting a `Record _` into an `Option _`.
-class FromRecordOption (list :: Prim.RowList.RowList) (record :: #Type) (option :: #Type) | list -> option record where
+class FromRecordOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -550,7 +550,7 @@ else instance fromRecordOptionCons ::
     value = Record.get label record
 
 -- | A typeclass that iterates a `RowList` selecting the fields from a `Record _`.
-class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (required :: #Type) | list -> required record where
+class FromRecordRequired (list :: Prim.RowList.RowList) (record :: # Type) (required :: # Type) | list -> required record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -610,7 +610,7 @@ else instance fromRecordRequiredCons ::
 -- | ```
 -- |
 -- | This can also be roughtly thought of as a monomorphic `Data.Traversable.sequence`.
-class GetAll (option :: #Type) (record :: #Type) | option -> record where
+class GetAll (option :: # Type) (record :: # Type) | option -> record where
   -- | Attempts to fetch all of the values from all of the keys of an option.
   -- |
   -- | If every key exists in the option, the record of values is returned in `Just _`.
@@ -647,7 +647,7 @@ instance getAllAny ::
   getAll' = getAllOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Maybe (Record _)`.
-class GetAllOption (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> option record where
+class GetAllOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: # Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -704,7 +704,7 @@ else instance getAllOptionCons ::
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | anotherOption = Option.insert'' { bar: 31 } someOption
 -- | ```
-class Insert (record :: #Type) (option' :: #Type) (option :: #Type) where
+class Insert (record :: # Type) (option' :: # Type) (option :: # Type) where
   insert'' ::
     Record record ->
     Option option' ->
@@ -723,7 +723,7 @@ instance insertAny ::
   insert'' = insertOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` inserting values in an `Option _`.
-class InsertOption (list :: Prim.RowList.RowList) (record :: #Type) (option' :: #Type) (option :: #Type) | list -> record where
+class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list -> record where
   insertOption ::
     forall proxy.
     proxy list ->
@@ -809,7 +809,7 @@ else instance insertOptionConsValue ::
 -- | A typeclass that converts a record of `JsonCodec`s into a `JsonCodec` for an option.
 -- |
 -- | This is useful to provide a straight-forward `JsonCodec` for an `Option _`.
-class JsonCodec (record :: #Type) (option :: #Type) where
+class JsonCodec (record :: # Type) (option :: # Type) where
   -- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
   -- |
   -- | E.g.
@@ -861,7 +861,7 @@ instance jsonCodecOptionAny ::
       (jsonCodecOption (Proxy :: Proxy list) record)
 
 -- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
-class JsonCodecOption (list :: Prim.RowList.RowList) (record :: #Type) (option :: #Type) | list -> option record where
+class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -949,7 +949,7 @@ else instance jsonCodecOptionCons ::
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
 class
-  (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+  (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1012,7 +1012,7 @@ else instance ordOptionCons ::
     rightValue = get label right'
 
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
-class ReadForeignOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1079,7 +1079,7 @@ else instance readForeignOptionCons ::
 -- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | anotherOption = Option.set'' { bar: 31 } someOption
 -- | ```
-class Set (record :: #Type) (option' :: #Type) (option :: #Type) where
+class Set (record :: # Type) (option' :: # Type) (option :: # Type) where
   set'' ::
     Record record ->
     Option option' ->
@@ -1098,7 +1098,7 @@ instance setAny ::
   set'' = setOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
-class SetOption (list :: Prim.RowList.RowList) (record :: #Type) (option' :: #Type) (option :: #Type) | list -> record where
+class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list -> record where
   setOption ::
     forall proxy.
     proxy list ->
@@ -1195,7 +1195,7 @@ else instance setOptionCons ::
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `List String`.
 -- | The `List String` should be processed into a single `String`.
-class ShowOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class ShowOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1261,7 +1261,7 @@ else instance showOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class ToRecord (option :: #Type) (record :: #Type) | option -> record where
+class ToRecord (option :: # Type) (record :: # Type) | option -> record where
   -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
   -- |
   -- | E.g.
@@ -1293,7 +1293,7 @@ instance toRecordAny ::
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> option record where
+class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: # Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1346,7 +1346,7 @@ else instance toRecordOptionCons ::
     value = get label option
 
 -- | A typeclass that iterates a `RowList` writing an `Option _` to a `Foreign`.
-class WriteForeignOption (list :: Prim.RowList.RowList) (option :: #Type) | list -> option where
+class WriteForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
