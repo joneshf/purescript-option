@@ -36,10 +36,10 @@ module Option
   , eqOption
   , class FromRecord
   , fromRecord'
-  , class FromRecordRequired
-  , fromRecordRequired
   , class FromRecordOption
   , fromRecordOption
+  , class FromRecordRequired
+  , fromRecordRequired
   , class GetAll
   , getAll'
   , class GetAllOption
@@ -500,54 +500,6 @@ instance fromRecordAny ::
     , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
     }
 
--- | A typeclass that iterates a `RowList` selecting the fields from a `Record _`.
-class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (required :: #Type) | list -> required record where
-  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
-  -- |
-  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
-  fromRecordRequired ::
-    forall proxy.
-    proxy list ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
-
-instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
-  fromRecordRequired ::
-    forall proxy.
-    proxy Prim.RowList.Nil ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record ())
-  fromRecordRequired _ _ = identity
-else instance fromRecordRequiredCons ::
-  ( Data.Symbol.IsSymbol label
-  , FromRecordRequired list record required'
-  , Prim.Row.Cons label value record' record
-  , Prim.Row.Cons label value required' required
-  , Prim.Row.Lacks label required'
-  ) =>
-  FromRecordRequired (Prim.RowList.Cons label value list) record required where
-  fromRecordRequired ::
-    forall proxy.
-    proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
-  fromRecordRequired _ record = first <<< rest
-    where
-    first :: Record.Builder.Builder (Record required') (Record required)
-    first = Record.Builder.insert label value
-
-    value :: value
-    value = Record.get label record
-
-    rest :: Record.Builder.Builder (Record ()) (Record required')
-    rest = fromRecordRequired proxy record
-
-    proxy :: Proxy list
-    proxy = Proxy
-
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
-
 -- | A typeclass that iterates a `RowList` converting a `Record _` into an `Option _`.
 class FromRecordOption (list :: Prim.RowList.RowList) (record :: #Type) (option :: #Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
@@ -593,6 +545,54 @@ else instance fromRecordOptionCons ::
 
     record' :: Record record'
     record' = Record.delete label record
+
+    value :: value
+    value = Record.get label record
+
+-- | A typeclass that iterates a `RowList` selecting the fields from a `Record _`.
+class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (required :: #Type) | list -> required record where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  fromRecordRequired ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record required)
+
+instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
+  fromRecordRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record ())
+  fromRecordRequired _ _ = identity
+else instance fromRecordRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , FromRecordRequired list record required'
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Lacks label required'
+  ) =>
+  FromRecordRequired (Prim.RowList.Cons label value list) record required where
+  fromRecordRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record required)
+  fromRecordRequired _ record = first <<< rest
+    where
+    first :: Record.Builder.Builder (Record required') (Record required)
+    first = Record.Builder.insert label value
+
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    rest :: Record.Builder.Builder (Record ()) (Record required')
+    rest = fromRecordRequired proxy record
 
     value :: value
     value = Record.get label record
