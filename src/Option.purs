@@ -483,7 +483,7 @@ class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
 -- | Any fields in the expected option that do not exist in the record are not added.
 instance fromRecordAny ::
   ( FromRecordOption optionalList record optional
-  , FromRecordRequired requiredList record () required
+  , FromRecordRequired requiredList record required
   , Prim.RowList.RowToList optionalRowsForLookup optionalList
   , Prim.Row.Union required optionalRowsForLookup record -- givenRecordRows - requiredRows = optionalRowsForLookup
   , Prim.RowList.RowToList required requiredList
@@ -501,7 +501,7 @@ instance fromRecordAny ::
     }
 
 -- | A typeclass that iterates a `RowList` selecting the fields from a `Record _`.
-class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (from :: #Type) (required :: #Type) | list -> required record from where
+class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (required :: #Type) | list -> required record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -509,29 +509,28 @@ class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (from 
     forall proxy.
     proxy list ->
     Record record ->
-    Record.Builder.Builder (Record from) (Record required)
+    Record.Builder.Builder (Record ()) (Record required)
 
-instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () () where
+instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
   fromRecordRequired ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Record record ->
     Record.Builder.Builder (Record ()) (Record ())
   fromRecordRequired _ _ = identity
-
-instance fromRecordRequiredCons ::
+else instance fromRecordRequiredCons ::
   ( Data.Symbol.IsSymbol label
-  , FromRecordRequired list recordRows from mid
+  , FromRecordRequired list recordRows mid
   , Prim.Row.Cons label value trash_ recordRows
   , Prim.Row.Cons label value mid to
   , Prim.Row.Lacks label mid
   ) =>
-  FromRecordRequired (Prim.RowList.Cons label value list) recordRows from to where
+  FromRecordRequired (Prim.RowList.Cons label value list) recordRows to where
   fromRecordRequired ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
     Record recordRows ->
-    Record.Builder.Builder (Record from) (Record to)
+    Record.Builder.Builder (Record ()) (Record to)
   fromRecordRequired _ record = first <<< rest
     where
     first :: Record.Builder.Builder (Record mid) (Record to)
@@ -540,7 +539,7 @@ instance fromRecordRequiredCons ::
     value :: value
     value = Record.get label record
 
-    rest :: Record.Builder.Builder (Record from) (Record mid)
+    rest :: Record.Builder.Builder (Record ()) (Record mid)
     rest = fromRecordRequired proxy record
 
     proxy :: Proxy list
@@ -1284,7 +1283,7 @@ class ToRecord (option :: #Type) (record :: #Type) | option -> record where
 -- | All fields in the option that exist will have the value `Just _`.
 -- | All fields in the option that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption () list option record
+  ( ToRecordOption list option record
   , Prim.RowList.RowToList record list
   ) =>
   ToRecord option record where
@@ -1294,7 +1293,7 @@ instance toRecordAny ::
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> builder option record where
+class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1302,10 +1301,10 @@ class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder (Record builder) (Record record)
+    Record.Builder.Builder (Record ()) (Record record)
 
 instance toRecordOptionNil ::
-  ToRecordOption () Prim.RowList.Nil () () where
+  ToRecordOption Prim.RowList.Nil () () where
   toRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
@@ -1318,14 +1317,14 @@ else instance toRecordOptionCons ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption builder list option' record'
+  , ToRecordOption list option' record'
   ) =>
-  ToRecordOption builder (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
+  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder (Record builder) (Record record)
+    Record.Builder.Builder (Record ()) (Record record)
   toRecordOption _ option = first <<< rest
     where
     first :: Record.Builder.Builder (Record record') (Record record)
@@ -1340,7 +1339,7 @@ else instance toRecordOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record builder) (Record record')
+    rest :: Record.Builder.Builder (Record ()) (Record record')
     rest = toRecordOption proxy option'
 
     value :: Data.Maybe.Maybe value
