@@ -432,7 +432,12 @@ class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
   -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
   -- | option4 = Option.fromRecord' { qux: [] }
   -- | ```
-  fromRecord' :: Record record -> { optional :: Option optional, required :: { | required } }
+  fromRecord' ::
+    Record record ->
+    Record
+      ( optional :: Option optional
+      , required :: Record required
+      )
 
 -- | This instance converts a record into an option.
 -- |
@@ -463,7 +468,7 @@ class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (from 
     forall proxy.
     proxy list ->
     Record record ->
-    Record.Builder.Builder { | from } { | required }
+    Record.Builder.Builder (Record from) (Record required)
 
 instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () () where
   fromRecordRequired ::
@@ -488,13 +493,13 @@ instance fromRecordRequiredCons ::
     Record.Builder.Builder (Record from) (Record to)
   fromRecordRequired _ record = first <<< rest
     where
-    first :: Record.Builder.Builder { | mid } { | to }
+    first :: Record.Builder.Builder (Record mid) (Record to)
     first = Record.Builder.insert label value
 
     value :: value
     value = Record.get label record
 
-    rest :: Record.Builder.Builder { | from } { | mid }
+    rest :: Record.Builder.Builder (Record from) (Record mid)
     rest = fromRecordRequired proxy record
 
     proxy :: Proxy list
@@ -1455,7 +1460,10 @@ fromRecord ::
   forall option required record.
   FromRecord record required option =>
   Record record ->
-  { optional :: Option option, required :: { | required } }
+  Record
+    ( optional :: Option option
+    , required :: Record required
+    )
 fromRecord = fromRecord'
 
 -- | Attempts to fetch the value at the given key from an option.
