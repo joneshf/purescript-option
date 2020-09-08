@@ -15,6 +15,7 @@
 module Option
   ( Option
   , fromRecord
+  , fromRecordWithRequired
   , delete
   , empty
   , get
@@ -35,10 +36,10 @@ module Option
   , eqOption
   , class FromRecord
   , fromRecord'
-  , class FromRecordRequired
-  , fromRecordRequired
   , class FromRecordOption
   , fromRecordOption
+  , class FromRecordRequired
+  , fromRecordRequired
   , class GetAll
   , getAll'
   , class GetAllOption
@@ -388,8 +389,11 @@ else instance eqOptionCons ::
 
 -- | A typeclass for converting a `Record _` into an `Option _`.
 -- |
--- | An instance `FromRecord record option` states that we can make an `Option option` from a `Record record` where every field present in the record is present in the option.
--- | E.g. `FromRecord () ( name :: String )` says that the `Option ( name :: String )` will have no value; and `FromRecord ( name :: String ) ( name :: String )` says that the `Option ( name :: String )` will have the given `name` value.
+-- | An instance `FromRecord record required optional` states that we can make a `Record required` and an `Option optional` from a `Record record` where every required field is in the record and the rest of the present fields in the record is present in the option.
+-- | E.g. `FromRecord () () ( name :: String )` says that the `Record ()` has no fields and the `Option ( name :: String )` will have no value;
+-- | `FromRecord ( name :: String ) () ( name :: String )` says that the `Record ()` has no fields and the `Option ( name :: String )` will have the given `name` value;
+-- | `FromRecord ( name :: String ) ( name :: String ) ()` says that the `Record ( name :: String )` has the given `name` value and the `Option ()` will have no value;
+-- | `FromRecord () ( name :: String) ()` is a type error since the `name` field is required but the given record lacks the field.
 -- |
 -- | Since there is syntax for creating records, but no syntax for creating options, this typeclass can be useful for providing an easier to use interface to options.
 -- |
@@ -410,29 +414,67 @@ else instance eqOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class FromRecord (record :: #Type) (required :: #Type) (option :: #Type) | record -> option required where
-  -- | The given `Record record` must have no more fields than the expected `Option _`.
+class FromRecord (record :: #Type) (required :: #Type) (optional :: #Type) where
+  -- | The given `Record record` must have no more fields than expected.
   -- |
   -- | E.g. The following definitions are valid.
   -- | ```PureScript
-  -- | option1 :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | option1 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- |     , required :: Record ()
+  -- |     )
   -- | option1 = Option.fromRecord' { foo: true, bar: 31 }
   -- |
-  -- | option2 :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | option2 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- |     , required :: Record ()
+  -- |     )
   -- | option2 = Option.fromRecord' {}
+  -- |
+  -- | option3 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( bar :: Int )
+  -- |     , required :: Record ( foo :: Boolean )
+  -- |     )
+  -- | option3 = Option.fromRecord' { foo: true }
   -- | ```
   -- |
   -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
   -- | ```PureScript
   -- | -- This will not work as it has the extra field `baz`
-  -- | option3 :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | option3 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- |     , required :: Record ()
+  -- |     )
   -- | option3 = Option.fromRecord' { foo: true, bar: 31, baz: "hi" }
   -- |
   -- | -- This will not work as it has the extra field `qux`
-  -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | option4 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- |     , required :: Record ()
+  -- |     )
   -- | option4 = Option.fromRecord' { qux: [] }
   -- | ```
-  fromRecord' :: Record record -> { optional :: Option option, required :: { | required } }
+  -- |
+  -- | And, this definition is not valid as the given record lacks the required fields.
+  -- | ```PureScript
+  -- | option5 ::
+  -- |   Record
+  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- |     , required :: Record ( baz :: String )
+  -- |     )
+  -- | option5 = Option.fromRecord' { foo: true, bar: 31 }
+  -- | ```
+  fromRecord' ::
+    Record record ->
+    Record
+      ( optional :: Option optional
+      , required :: Record required
+      )
 
 -- | This instance converts a record into an option.
 -- |
@@ -440,53 +482,23 @@ class FromRecord (record :: #Type) (required :: #Type) (option :: #Type) | recor
 -- |
 -- | Any fields in the expected option that do not exist in the record are not added.
 instance fromRecordAny ::
-  ( FromRecordOption optionalList record option
-  , FromRecordRequired requiredList record () required
-  , Prim.RowList.RowToList optionalRowsForLookup optionalList
-  , Prim.Row.Union required optionalRowsForLookup record -- givenRecordRows - requiredRows = optionalRowsForLookup
+  ( FromRecordOption optionalList record optional
+  , FromRecordRequired requiredList record required
+  , Prim.Row.Union required optional' record
+  , Prim.RowList.RowToList optional' optionalList
   , Prim.RowList.RowToList required requiredList
   ) =>
-  FromRecord record required option where
-  --  fromRecord' :: Record record -> Option option
+  FromRecord record required optional where
+  fromRecord' ::
+    Record record ->
+    Record
+      ( optional :: Option optional
+      , required :: Record required
+      )
   fromRecord' record =
     { optional: fromRecordOption (Proxy :: Proxy optionalList) record
     , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
     }
-
-class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (from :: #Type) (required :: #Type) | list -> required record from where
-  fromRecordRequired ::
-    forall proxy.
-    proxy list ->
-    Record record ->
-    Record.Builder.Builder { | from } { | required }
-
-instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () () where
-  fromRecordRequired _ _ = identity
-
-instance fromRecordRequiredCons ::
-  ( Data.Symbol.IsSymbol label
-  , FromRecordRequired list recordRows from mid
-  , Prim.Row.Cons label value trash_ recordRows
-  , Prim.Row.Cons label value mid to
-  , Prim.Row.Lacks label mid
-  ) =>
-  FromRecordRequired (Prim.RowList.Cons label value list) recordRows from to where
-  fromRecordRequired _ record = first <<< rest
-    where
-    first :: Record.Builder.Builder { | mid } { | to }
-    first = Record.Builder.insert label value
-
-    value :: value
-    value = Record.get label record
-
-    rest :: Record.Builder.Builder { | from } { | mid }
-    rest = fromRecordRequired proxy record
-
-    proxy :: Proxy list
-    proxy = Proxy
-
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
 
 -- | A typeclass that iterates a `RowList` converting a `Record _` into an `Option _`.
 class FromRecordOption (list :: Prim.RowList.RowList) (record :: #Type) (option :: #Type) | list -> option record where
@@ -533,6 +545,54 @@ else instance fromRecordOptionCons ::
 
     record' :: Record record'
     record' = Record.delete label record
+
+    value :: value
+    value = Record.get label record
+
+-- | A typeclass that iterates a `RowList` selecting the fields from a `Record _`.
+class FromRecordRequired (list :: Prim.RowList.RowList) (record :: #Type) (required :: #Type) | list -> required record where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  fromRecordRequired ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record required)
+
+instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
+  fromRecordRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record ())
+  fromRecordRequired _ _ = identity
+else instance fromRecordRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , FromRecordRequired list record required'
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Lacks label required'
+  ) =>
+  FromRecordRequired (Prim.RowList.Cons label value list) record required where
+  fromRecordRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Record record ->
+    Record.Builder.Builder (Record ()) (Record required)
+  fromRecordRequired _ record = first <<< rest
+    where
+    first :: Record.Builder.Builder (Record required') (Record required)
+    first = Record.Builder.insert label value
+
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    rest :: Record.Builder.Builder (Record ()) (Record required')
+    rest = fromRecordRequired proxy record
 
     value :: value
     value = Record.get label record
@@ -1223,7 +1283,7 @@ class ToRecord (option :: #Type) (record :: #Type) | option -> record where
 -- | All fields in the option that exist will have the value `Just _`.
 -- | All fields in the option that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption () list option record
+  ( ToRecordOption list option record
   , Prim.RowList.RowToList record list
   ) =>
   ToRecord option record where
@@ -1233,7 +1293,7 @@ instance toRecordAny ::
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
-class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> builder option record where
+class ToRecordOption (list :: Prim.RowList.RowList) (option :: #Type) (record :: #Type) | list -> option record where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1241,10 +1301,10 @@ class ToRecordOption (builder :: #Type) (list :: Prim.RowList.RowList) (option :
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder (Record builder) (Record record)
+    Record.Builder.Builder (Record ()) (Record record)
 
 instance toRecordOptionNil ::
-  ToRecordOption () Prim.RowList.Nil () () where
+  ToRecordOption Prim.RowList.Nil () () where
   toRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
@@ -1257,14 +1317,14 @@ else instance toRecordOptionCons ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption builder list option' record'
+  , ToRecordOption list option' record'
   ) =>
-  ToRecordOption builder (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
+  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder (Record builder) (Record record)
+    Record.Builder.Builder (Record ()) (Record record)
   toRecordOption _ option = first <<< rest
     where
     first :: Record.Builder.Builder (Record record') (Record record)
@@ -1279,7 +1339,7 @@ else instance toRecordOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record builder) (Record record')
+    rest :: Record.Builder.Builder (Record ()) (Record record')
     rest = toRecordOption proxy option'
 
     value :: Data.Maybe.Maybe value
@@ -1434,14 +1494,85 @@ empty = Option Foreign.Object.empty
 -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | option4 = Option.fromRecord { qux: [] }
 -- | ```
+fromRecord ::
+  forall option record.
+  FromRecord record () option =>
+  Record record ->
+  Option option
+fromRecord record = result.optional
+  where
+  result ::
+    Record
+      ( optional :: Option option
+      , required :: Record ()
+      )
+  result = fromRecord' record
+
+-- | The given `Record record` must have no more fields than expected.
+-- |
+-- | E.g. The following definitions are valid.
+-- | ```PureScript
+-- | option1 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option1 = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | option2 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option2 = Option.fromRecord {}
+-- |
+-- | option3 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( bar :: Int )
+-- |     , required :: Record ( foo :: Boolean )
+-- |     )
+-- | option3 = Option.fromRecord { foo: true }
+-- | ```
+-- |
+-- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
+-- | ```PureScript
+-- | -- This will not work as it has the extra field `baz`
+-- | option3 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option3 = Option.fromRecord { foo: true, bar: 31, baz: "hi" }
+-- |
+-- | -- This will not work as it has the extra field `qux`
+-- | option4 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ()
+-- |     )
+-- | option4 = Option.fromRecord { qux: [] }
+-- | ```
+-- |
+-- | And, this definition is not valid as the given record lacks the required fields.
+-- | ```PureScript
+-- | option5 ::
+-- |   Record
+-- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
+-- |     , required :: Record ( baz :: String )
+-- |     )
+-- | option5 = Option.fromRecord { foo: true, bar: 31 }
+-- | ```
 -- |
 -- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
-fromRecord ::
+fromRecordWithRequired ::
   forall option required record.
   FromRecord record required option =>
   Record record ->
-  { optional :: Option option, required :: { | required } }
-fromRecord = fromRecord'
+  Record
+    ( optional :: Option option
+    , required :: Record required
+    )
+fromRecordWithRequired = fromRecord'
 
 -- | Attempts to fetch the value at the given key from an option.
 -- |
@@ -1743,10 +1874,10 @@ user4 = delete (Data.Symbol.SProxy :: _ "age") user
 user5 :: Option ( username :: String, age :: Boolean )
 user5 = modify (Data.Symbol.SProxy :: _ "age") (\_ -> true) user
 
-user6 :: { optional :: User, required :: {} }
+user6 :: User
 user6 = fromRecord {}
 
-user7 :: { optional :: User, required :: {} }
+user7 :: User
 user7 = fromRecord { age: 10 }
 
 user8 :: { age :: Data.Maybe.Maybe Int, username :: Data.Maybe.Maybe String }
@@ -1774,20 +1905,4 @@ user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
-testing = fromRecord { title: "Mr.", name: "" }
-
-greet ::
-  forall record.
-  FromRecord record ( name :: String ) ( title :: String, greeting :: String ) =>
-  { | record } -> String
-greet r =
-  let
-    { required, optional } = fromRecord r
-
-    greeting = Data.Maybe.fromMaybe "Hi" (get (Data.Symbol.SProxy :: _ "greeting") optional)
-
-    title = case get (Data.Symbol.SProxy :: _ "title") optional of
-      Data.Maybe.Just v -> v <> " "
-      Data.Maybe.Nothing -> ""
-  in
-    greeting <> ", " <> title <> required.name
+testing = fromRecordWithRequired { title: "Mr.", name: "" }
