@@ -226,19 +226,18 @@ class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list 
     Foreign.Object.Object Data.Argonaut.Core.Json ->
     Data.Either.Either String (Option option)
 
-instance decodeJsonOptionNil :: DecodeJsonOption Prim.RowList.Nil () where
+instance decodeJsonOptionNil :: DecodeJsonOption Prim.RowList.Nil option where
   decodeJsonOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Foreign.Object.Object Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Option ())
+    Data.Either.Either String (Option option)
   decodeJsonOption _ _ = Data.Either.Right empty
 else instance decodeJsonOptionCons ::
   ( Data.Argonaut.Decode.Class.DecodeJson value
   , Data.Symbol.IsSymbol label
-  , DecodeJsonOption list option'
+  , DecodeJsonOption list option
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   ) =>
   DecodeJsonOption (Prim.RowList.Cons label value list) option where
   decodeJsonOption ::
@@ -250,7 +249,7 @@ else instance decodeJsonOptionCons ::
     Data.Maybe.Just json -> do
       value <- Data.Argonaut.Decode.Class.decodeJson json
       option <- option'
-      Data.Either.Right (insert label value option)
+      Data.Either.Right (set label value option)
     Data.Maybe.Nothing -> do
       Option object <- option'
       Data.Either.Right (Option object)
@@ -261,7 +260,7 @@ else instance decodeJsonOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    option' :: Data.Either.Either String (Option option')
+    option' :: Data.Either.Either String (Option option)
     option' = decodeJsonOption proxy object'
 
     proxy :: Proxy list
@@ -279,19 +278,18 @@ class EncodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list 
     Data.Argonaut.Core.Json
 
 instance encodeJsonOptionNil ::
-  EncodeJsonOption Prim.RowList.Nil () where
+  EncodeJsonOption Prim.RowList.Nil option where
   encodeJsonOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
+    Option option ->
     Data.Argonaut.Core.Json
   encodeJsonOption _ _ = Data.Argonaut.Core.jsonEmptyObject
 else instance encodeJsonOptionCons ::
   ( Data.Argonaut.Encode.Class.EncodeJson value
   , Data.Symbol.IsSymbol label
-  , EncodeJsonOption list option'
+  , EncodeJsonOption list option
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   ) =>
   EncodeJsonOption (Prim.RowList.Cons label value list) option where
   encodeJsonOption ::
@@ -310,16 +308,13 @@ else instance encodeJsonOptionCons ::
     Data.Maybe.Nothing -> json
     where
     json :: Data.Argonaut.Core.Json
-    json = encodeJsonOption proxy option'
+    json = encodeJsonOption proxy option
 
     key :: String
     key = Data.Symbol.reflectSymbol label
 
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
-
-    option' :: Option option'
-    option' = delete label option
 
     proxy :: Proxy list
     proxy = Proxy
@@ -339,20 +334,19 @@ class EqOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> optio
     Option option ->
     Boolean
 
-instance eqOptionNil :: EqOption Prim.RowList.Nil () where
+instance eqOptionNil :: EqOption Prim.RowList.Nil option where
   eqOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
-    Option () ->
+    Option option ->
+    Option option ->
     Boolean
   eqOption _ _ _ = true
 else instance eqOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Eq value
-  , EqOption list option'
+  , EqOption list option
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   ) =>
   EqOption (Prim.RowList.Cons label value list) option where
   eqOption ::
@@ -361,7 +355,7 @@ else instance eqOptionCons ::
     Option option ->
     Option option ->
     Boolean
-  eqOption _ left' right' = leftValue == rightValue && rest
+  eqOption _ left right = leftValue == rightValue && rest
     where
     key :: String
     key = Data.Symbol.reflectSymbol label
@@ -369,11 +363,8 @@ else instance eqOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    left :: Option option'
-    left = delete label left'
-
     leftValue :: Data.Maybe.Maybe value
-    leftValue = get label left'
+    leftValue = get label left
 
     proxy :: Proxy list
     proxy = Proxy
@@ -381,11 +372,8 @@ else instance eqOptionCons ::
     rest :: Boolean
     rest = eqOption proxy left right
 
-    right :: Option option'
-    right = delete label right'
-
     rightValue :: Data.Maybe.Maybe value
-    rightValue = get label right'
+    rightValue = get label right
 
 -- | A typeclass for converting a `Record _` into an `Option _`.
 -- |
@@ -520,11 +508,9 @@ instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option 
   fromRecordOption _ _ = empty
 else instance fromRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
-  , FromRecordOption list record' option'
+  , FromRecordOption list record option
   , Prim.Row.Cons label value option' option
   , Prim.Row.Cons label value record' record
-  , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
   ) =>
   FromRecordOption (Prim.RowList.Cons label value list) record option where
   fromRecordOption ::
@@ -532,19 +518,16 @@ else instance fromRecordOptionCons ::
     proxy (Prim.RowList.Cons label value list) ->
     Record record ->
     Option option
-  fromRecordOption _ record = insert label value option
+  fromRecordOption _ record = set label value option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option :: Option option'
-    option = fromRecordOption proxy record'
+    option :: Option option
+    option = fromRecordOption proxy record
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record' :: Record record'
-    record' = Record.delete label record
 
     value :: value
     value = Record.get label record
@@ -658,15 +641,14 @@ class GetAllOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: 
     Data.Maybe.Maybe (Record record)
 
 instance getAllOptionNil ::
-  GetAllOption Prim.RowList.Nil () () where
+  GetAllOption Prim.RowList.Nil option () where
   getAllOption _ _ = Data.Maybe.Just {}
 else instance getAllOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value option' option
   , Prim.Row.Cons label value record' record
-  , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , GetAllOption list option' record'
+  , GetAllOption list option record'
   ) =>
   GetAllOption (Prim.RowList.Cons label value list) option record where
   getAllOption _ option = case record' of
@@ -678,14 +660,11 @@ else instance getAllOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Option option'
-    option' = delete label option
-
     proxy :: Proxy list
     proxy = Proxy
 
     record' :: Data.Maybe.Maybe (Record record')
-    record' = getAllOption proxy option'
+    record' = getAllOption proxy option
 
     value' :: Data.Maybe.Maybe value
     value' = get label option
@@ -732,11 +711,11 @@ class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
     Option option
 
 instance insertOptionNil ::
-  InsertOption Prim.RowList.Nil () option option where
+  InsertOption Prim.RowList.Nil record option option where
   insertOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record () ->
+    Record record ->
     Option option ->
     Option option
   insertOption _ _ option = option
@@ -745,8 +724,7 @@ else instance insertOptionConsMaybe ::
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
   , Prim.Row.Cons label value option' option
   , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
-  , InsertOption list record' oldOption option'
+  , InsertOption list record oldOption option'
   ) =>
   InsertOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record oldOption option where
   insertOption ::
@@ -764,13 +742,10 @@ else instance insertOptionConsMaybe ::
     label = Data.Symbol.SProxy
 
     option :: Option option'
-    option = insertOption proxy record' oldOption
+    option = insertOption proxy record oldOption
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record' :: Record record'
-    record' = Record.delete label record
 
     value' :: Data.Maybe.Maybe value
     value' = Record.get label record
@@ -779,8 +754,7 @@ else instance insertOptionConsValue ::
   , Prim.Row.Cons label value record' record
   , Prim.Row.Cons label value option' option
   , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
-  , InsertOption list record' oldOption option'
+  , InsertOption list record oldOption option'
   ) =>
   InsertOption (Prim.RowList.Cons label value list) record oldOption option where
   insertOption ::
@@ -795,13 +769,10 @@ else instance insertOptionConsValue ::
     label = Data.Symbol.SProxy
 
     option :: Option option'
-    option = insertOption proxy record' oldOption
+    option = insertOption proxy record oldOption
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record' :: Record record'
-    record' = Record.delete label record
 
     value :: value
     value = Record.get label record
@@ -871,12 +842,12 @@ class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option 
     Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
 
-instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil () () where
+instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option where
   jsonCodecOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record () ->
-    Data.Codec.Argonaut.JPropCodec (Option ())
+    Record record ->
+    Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ _ =
     Data.Codec.mapCodec
       (\_ -> Data.Either.Right empty)
@@ -884,11 +855,9 @@ instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil () () where
       Data.Codec.Argonaut.record
 else instance jsonCodecOptionCons ::
   ( Data.Symbol.IsSymbol label
-  , JsonCodecOption list record' option'
+  , JsonCodecOption list record option
   , Prim.Row.Cons label value' option' option
   , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value') record' record
-  , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
   , Type.Equality.TypeEquals value (Data.Codec.Argonaut.JsonCodec value')
   ) =>
   JsonCodecOption (Prim.RowList.Cons label value list) record option where
@@ -897,13 +866,13 @@ else instance jsonCodecOptionCons ::
     proxy (Prim.RowList.Cons label value list) ->
     Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
-  jsonCodecOption _ record' =
+  jsonCodecOption _ record =
     Data.Codec.GCodec
       (Control.Monad.Reader.Trans.ReaderT decode)
       (Data.Profunctor.Star.Star encode)
     where
     codec :: Data.Codec.Argonaut.JsonCodec value'
-    codec = Record.get label record'
+    codec = Record.get label record
 
     decode ::
       Foreign.Object.Object Data.Argonaut.Core.Json ->
@@ -913,7 +882,7 @@ else instance jsonCodecOptionCons ::
       case Foreign.Object.lookup key object' of
         Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
           Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
-          Data.Either.Right value -> Data.Either.Right (insert label value option)
+          Data.Either.Right value -> Data.Either.Right (set label value option)
         Data.Maybe.Nothing -> Data.Either.Right (Option object)
 
     encode ::
@@ -929,7 +898,7 @@ else instance jsonCodecOptionCons ::
             )
         Data.Maybe.Nothing -> pure unit
       Control.Monad.Writer.Class.tell
-        (Data.Codec.Argonaut.encode option' (delete label option))
+        (Data.Codec.Argonaut.encode option' option)
       pure option
 
     key :: String
@@ -938,14 +907,11 @@ else instance jsonCodecOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Data.Codec.Argonaut.JPropCodec (Option option')
+    option' :: Data.Codec.Argonaut.JPropCodec (Option option)
     option' = jsonCodecOption proxy record
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record :: Record record'
-    record = Record.delete label record'
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
 class
@@ -960,20 +926,19 @@ class
     Option option ->
     Ordering
 
-instance ordOptionNil :: OrdOption Prim.RowList.Nil () where
+instance ordOptionNil :: OrdOption Prim.RowList.Nil option where
   compareOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
-    Option () ->
+    Option option ->
+    Option option ->
     Ordering
   compareOption _ _ _ = EQ
 else instance ordOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Ord value
-  , OrdOption list option'
+  , OrdOption list option
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   ) =>
   OrdOption (Prim.RowList.Cons label value list) option where
   compareOption ::
@@ -982,7 +947,7 @@ else instance ordOptionCons ::
     Option option ->
     Option option ->
     Ordering
-  compareOption _ left' right' = case compare leftValue rightValue of
+  compareOption _ left right = case compare leftValue rightValue of
     EQ -> rest
     GT -> GT
     LT -> LT
@@ -993,11 +958,8 @@ else instance ordOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    left :: Option option'
-    left = delete label left'
-
     leftValue :: Data.Maybe.Maybe value
-    leftValue = get label left'
+    leftValue = get label left
 
     proxy :: Proxy list
     proxy = Proxy
@@ -1005,11 +967,8 @@ else instance ordOptionCons ::
     rest :: Ordering
     rest = compareOption proxy left right
 
-    right :: Option option'
-    right = delete label right'
-
     rightValue :: Data.Maybe.Maybe value
-    rightValue = get label right'
+    rightValue = get label right
 
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
 class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
@@ -1022,18 +981,17 @@ class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list
     Foreign.Foreign ->
     Foreign.F (Option option)
 
-instance readForeignOptionNil :: ReadForeignOption Prim.RowList.Nil () where
+instance readForeignOptionNil :: ReadForeignOption Prim.RowList.Nil option where
   readImplOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Foreign.Foreign ->
-    Foreign.F (Option ())
+    Foreign.F (Option option)
   readImplOption _ _ = pure empty
 else instance readForeignOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
-  , ReadForeignOption list option'
+  , ReadForeignOption list option
   , Simple.JSON.ReadForeign value
   ) =>
   ReadForeignOption (Prim.RowList.Cons label value list) option where
@@ -1050,7 +1008,7 @@ else instance readForeignOptionCons ::
           Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
           Data.Either.Right value' -> case Control.Monad.Except.runExcept (Simple.JSON.readImpl value') of
             Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
-            Data.Either.Right value -> Data.Either.Right (insert label value option)
+            Data.Either.Right value -> Data.Either.Right (set label value option)
       false -> pure (Option object)
     where
     key :: String
@@ -1059,7 +1017,7 @@ else instance readForeignOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Foreign.F (Option option')
+    option' :: Foreign.F (Option option)
     option' = readImplOption proxy foreign'
 
     proxy :: Proxy list
@@ -1107,11 +1065,11 @@ class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # 
     Option option
 
 instance setOptionNil ::
-  SetOption Prim.RowList.Nil () option option where
+  SetOption Prim.RowList.Nil record option option where
   setOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record () ->
+    Record record ->
     Option option ->
     Option option
   setOption _ _ option = option
@@ -1122,8 +1080,7 @@ else instance setOptionConsMaybe ::
   , Prim.Row.Cons label value oldOption' oldOption
   , Prim.Row.Lacks label oldOption'
   , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
-  , SetOption list record' oldOption' option'
+  , SetOption list record oldOption' option'
   ) =>
   SetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record oldOption option where
   setOption ::
@@ -1146,13 +1103,10 @@ else instance setOptionConsMaybe ::
     oldOption' = delete label oldOption
 
     option :: Option option'
-    option = setOption proxy record' oldOption'
+    option = setOption proxy record oldOption'
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record' :: Record record'
-    record' = Record.delete label record
 
     value' :: Data.Maybe.Maybe value
     value' = Record.get label record
@@ -1163,8 +1117,7 @@ else instance setOptionCons ::
   , Prim.Row.Cons label value' oldOption' oldOption
   , Prim.Row.Lacks label oldOption'
   , Prim.Row.Lacks label option'
-  , Prim.Row.Lacks label record'
-  , SetOption list record' oldOption' option'
+  , SetOption list record oldOption' option'
   ) =>
   SetOption (Prim.RowList.Cons label value list) record oldOption option where
   setOption ::
@@ -1182,13 +1135,10 @@ else instance setOptionCons ::
     oldOption' = delete label oldOption
 
     option :: Option option'
-    option = setOption proxy record' oldOption'
+    option = setOption proxy record oldOption'
 
     proxy :: Proxy list
     proxy = Proxy
-
-    record' :: Record record'
-    record' = Record.delete label record
 
     value :: value
     value = Record.get label record
@@ -1205,19 +1155,18 @@ class ShowOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> opt
     Option option ->
     Data.List.List String
 
-instance showOptionNil :: ShowOption Prim.RowList.Nil () where
+instance showOptionNil :: ShowOption Prim.RowList.Nil option where
   showOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
+    Option option ->
     Data.List.List String
   showOption _ _ = Data.List.Nil
 else instance showOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Show value
-  , ShowOption list option'
+  , ShowOption list option
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   ) =>
   ShowOption (Prim.RowList.Cons label value list) option where
   showOption ::
@@ -1235,14 +1184,11 @@ else instance showOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Option option'
-    option' = delete label option
-
     proxy :: Proxy list
     proxy = Proxy
 
     rest :: Data.List.List String
-    rest = showOption proxy option'
+    rest = showOption proxy option
 
     value' :: Data.Maybe.Maybe value
     value' = get label option
@@ -1304,20 +1250,19 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :
     Record.Builder.Builder (Record ()) (Record record)
 
 instance toRecordOptionNil ::
-  ToRecordOption Prim.RowList.Nil () () where
+  ToRecordOption Prim.RowList.Nil option () where
   toRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
+    Option option ->
     Record.Builder.Builder (Record ()) (Record ())
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value option' option
   , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
-  , Prim.Row.Lacks label option'
   , Prim.Row.Lacks label record'
-  , ToRecordOption list option' record'
+  , ToRecordOption list option record'
   ) =>
   ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
   toRecordOption ::
@@ -1333,14 +1278,11 @@ else instance toRecordOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Option option'
-    option' = delete label option
-
     proxy :: Proxy list
     proxy = Proxy
 
     rest :: Record.Builder.Builder (Record ()) (Record record')
-    rest = toRecordOption proxy option'
+    rest = toRecordOption proxy option
 
     value :: Data.Maybe.Maybe value
     value = get label option
@@ -1357,19 +1299,18 @@ class WriteForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | lis
     Foreign.Foreign
 
 instance writeForeignOptionNil ::
-  WriteForeignOption Prim.RowList.Nil () where
+  WriteForeignOption Prim.RowList.Nil option where
   writeForeignOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Option () ->
+    Option option ->
     Foreign.Foreign
   writeForeignOption _ _ = Foreign.unsafeToForeign {}
 else instance writeForeignOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value option' option
-  , Prim.Row.Lacks label option'
   , Simple.JSON.WriteForeign value
-  , WriteForeignOption list option'
+  , WriteForeignOption list option
   ) =>
   WriteForeignOption (Prim.RowList.Cons label value list) option where
   writeForeignOption ::
@@ -1377,7 +1318,7 @@ else instance writeForeignOptionCons ::
     proxy (Prim.RowList.Cons label value list) ->
     Option option ->
     Foreign.Foreign
-  writeForeignOption _ option' = case value' of
+  writeForeignOption _ option = case value' of
     Data.Maybe.Just value ->
       Foreign.unsafeToForeign
         (Foreign.Object.insert key (Simple.JSON.writeImpl value) object)
@@ -1395,14 +1336,11 @@ else instance writeForeignOptionCons ::
     object :: Foreign.Object.Object Foreign.Foreign
     object = Foreign.unsafeFromForeign foreign'
 
-    option :: Option option'
-    option = delete label option'
-
     proxy :: Proxy list
     proxy = Proxy
 
     value' :: Data.Maybe.Maybe value
-    value' = get label option'
+    value' = get label option
 
 -- Do not export this value. It can be abused to invalidate invariants.
 alter ::
