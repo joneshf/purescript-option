@@ -1668,14 +1668,14 @@ else instance writeForeignOptionCons ::
     value' = get label option
 
 -- Do not export this value. It can be abused to invalidate invariants.
-alter ::
+alter' ::
   forall label option option' proxy value value'.
   Data.Symbol.IsSymbol label =>
   (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) ->
   proxy label ->
   Option option' ->
   { option :: Option option, value :: Data.Maybe.Maybe value }
-alter f proxy (Option object) = { option, value }
+alter' f proxy (Option object) = { option, value }
   where
   from :: forall a. Data.Maybe.Maybe a -> Data.Maybe.Maybe value'
   from = Unsafe.Coerce.unsafeCoerce
@@ -1716,7 +1716,7 @@ delete ::
   proxy label ->
   Option option' ->
   Option option
-delete proxy option = (alter go proxy option).option
+delete proxy option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Nothing
@@ -1879,7 +1879,7 @@ get ::
   proxy label ->
   Option option ->
   Data.Maybe.Maybe value
-get proxy option = (alter go proxy option).value
+get proxy option = (alter' go proxy option).value
   where
   go :: Data.Maybe.Maybe value -> Data.Maybe.Maybe value
   go value = value
@@ -2018,7 +2018,7 @@ insert ::
   value ->
   Option option' ->
   Option option
-insert proxy value option = (alter go proxy option).option
+insert proxy value option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
@@ -2088,7 +2088,7 @@ modify ::
   (value' -> value) ->
   Option option' ->
   Option option
-modify proxy f option = (alter go proxy option).option
+modify proxy f option = (alter' go proxy option).option
   where
   go :: Data.Maybe.Maybe value' -> Data.Maybe.Maybe value
   go value' = case value' of
@@ -2142,7 +2142,7 @@ set ::
   value ->
   Option option' ->
   Option option
-set proxy value option = (alter go proxy option).option
+set proxy value option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
