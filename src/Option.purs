@@ -14,22 +14,34 @@
 -- | Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
 module Option
   ( Option
+  , alter
   , fromRecord
   , fromRecordWithRequired
   , delete
+  , delete'
   , empty
   , get
+  , get'
   , getAll
   , getWithDefault
   , insert
   , insert'
   , jsonCodec
   , modify
+  , modify'
   , set
   , set'
   , toRecord
+  , class Alter
+  , alter''
+  , class AlterOption
+  , alterOption
   , class DecodeJsonOption
   , decodeJsonOption
+  , class Delete
+  , delete''
+  , class DeleteOption
+  , deleteOption
   , class EncodeJsonOption
   , encodeJsonOption
   , class EqOption
@@ -40,6 +52,10 @@ module Option
   , fromRecordOption
   , class FromRecordRequired
   , fromRecordRequired
+  , class Get
+  , get''
+  , class GetOption
+  , getOption
   , class GetAll
   , getAll'
   , class GetAllOption
@@ -52,6 +68,10 @@ module Option
   , jsonCodec'
   , class JsonCodecOption
   , jsonCodecOption
+  , class Modify
+  , modify''
+  , class ModifyOption
+  , modifyOption
   , class OrdOption
   , compareOption
   , class ReadForeignOption
@@ -215,6 +235,97 @@ instance writeForeignOptionOption ::
     Foreign.Foreign
   writeImpl = writeForeignOption (Proxy :: Proxy list)
 
+-- | A typeclass that manipulates the values in an `Option _`.
+-- |
+-- | If the field exists in the `Option _`, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the `Option _`, there is no change to the `Option _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.alter'' { bar: \_ -> Data.Maybe.Just 41 } someOption
+-- | ```
+class Alter (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
+  alter'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance manipulates the values in an `Option _`.
+instance alterAny ::
+  ( AlterOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Alter record option' option where
+  alter'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  alter'' record option = alterOption (Proxy :: Proxy list) record option
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` manipulating values in an `Option _`.
+class AlterOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option -> option', list option' -> option where
+  alterOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance alterOptionNil ::
+  AlterOption Prim.RowList.Nil record option option where
+  alterOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  alterOption _ _ option = option
+else instance alterOptionCons ::
+  ( AlterOption list record oldOption' option'
+  , Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  ) =>
+  AlterOption (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) record oldOption option where
+  alterOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  alterOption _ record oldOption = case recordValue optionValue of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> case option of
+      Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    optionValue :: Data.Maybe.Maybe value'
+    optionValue = get label oldOption
+
+    option :: Option option'
+    option = alterOption proxy record oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    recordValue ::
+      Data.Maybe.Maybe value' ->
+      Data.Maybe.Maybe value
+    recordValue = Record.get label record
+
 -- | A typeclass that iterates a `RowList` decoding an `Object Json` to an `Option _`.
 class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
@@ -262,6 +373,75 @@ else instance decodeJsonOptionCons ::
 
     option' :: Data.Either.Either String (Option option)
     option' = decodeJsonOption proxy object'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+-- | A typeclass that removes keys from an option
+-- |
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | anotherOption :: Option.Option ( bar :: Int )
+-- | anotherOption = Option.delete'' { foo: unit } someOption
+-- | ```
+class Delete (record :: # Type) (option' :: # Type) (option :: # Type) | record option' -> option, record option -> option', option' option -> record where
+  delete'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance removes keys from an `Option _`.
+instance deleteAny ::
+  ( DeleteOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Delete record option' option where
+  delete'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  delete'' = deleteOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` removing keys from `Option _`.
+class DeleteOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, list option -> option' where
+  deleteOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance deleteOptionNil ::
+  DeleteOption Prim.RowList.Nil record option option where
+  deleteOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  deleteOption _ _ option = option
+else instance deleteOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , DeleteOption list record oldOption' option
+  , Prim.Row.Cons label value oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  ) =>
+  DeleteOption (Prim.RowList.Cons label Unit list) record oldOption option where
+  deleteOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label Unit list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  deleteOption _ record option' = deleteOption proxy record option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option :: Option oldOption'
+    option = delete label option'
 
     proxy :: Proxy list
     proxy = Proxy
@@ -579,6 +759,156 @@ else instance fromRecordRequiredCons ::
 
     value :: value
     value = Record.get label record
+
+-- | A typeclass that grabs the given fields of an `Option _`.
+-- |
+class Get (record' :: # Type) (option :: # Type) (record :: # Type) | option record' -> record, option record -> record', record record' -> option where
+  -- | Attempts to fetch the values from the given option.
+  -- |
+  -- | The behavior of what's returned depends on what the value is for each field in the record.
+  -- |
+  -- | If the value in the record is of type `Maybe a -> b` ,
+  -- | that function is run on the result of finding the field in the option.
+  -- |
+  -- | If the value in the record is of type `Maybe a` and the type of the field in the option is `a`,
+  -- | the result is `Just _` if the value exists in the option and whatever the provided `Maybe a` was otherwise.
+  -- |
+  -- | If the value in the record is of type `a` and the type of the field in the option is `a`,
+  -- | the result is whatever the value is in the option if it exists and whatever the provided `a` was otherwise.
+  -- |
+  -- | These behaviors allow handling different fields differently without jumping through hoops to get the values from an option.
+  -- |
+  -- | E.g.
+  -- | ```PureScript
+  -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+  -- | someOption = Option.empty
+  -- |
+  -- | -- Since `someOption` is empty,
+  -- | -- this will have a shape like:
+  -- | -- { foo: false, bar: "not set", qux: Data.Maybe.Nothing }
+  -- | someRecord :: Record ( foo :: Boolean, bar :: String, qux :: Data.Maybe.Maybe String )
+  -- | someRecord =
+  -- |   Option.get''
+  -- |     { foo: false
+  -- |     , bar: \x -> case x of
+  -- |         Data.Maybe.Just x -> if x > 0 then "positive" else "non-positive"
+  -- |         Data.Maybe.Nothing -> "not set"
+  -- |     , qux: Data.Maybe.Nothing
+  -- |     }
+  -- |     someOption
+  -- | ```
+  get'' ::
+    Record record' ->
+    Option option ->
+    Record record
+
+-- | This instance converts grabs the given fields of an `Option _`.
+instance getAny ::
+  ( GetOption list record' option record
+  , Prim.RowList.RowToList record' list
+  ) =>
+  Get record' option record where
+  get'' record option = getOption (Proxy :: Proxy list) record option
+
+-- | A typeclass that iterates a `RowList` grabbing the given fields of an `Option _`.
+class GetOption (list :: Prim.RowList.RowList) (record' :: # Type) (option :: # Type) (record :: # Type) | list -> record where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  getOption ::
+    forall proxy.
+    proxy list ->
+    Record record' ->
+    Option option ->
+    Record record
+
+instance getOptionNil ::
+  GetOption Prim.RowList.Nil record' option () where
+  getOption _ _ _ = {}
+else instance getOptionConsFunction ::
+  ( Data.Symbol.IsSymbol label
+  , GetOption list givenRecord option record'
+  , Prim.Row.Cons label (Data.Maybe.Maybe value -> result) givenRecord' givenRecord
+  , Prim.Row.Cons label result record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Lacks label record'
+  ) =>
+  GetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value -> result) list) givenRecord option record where
+  getOption _ record' option = Record.insert label value record
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    optionValue :: Data.Maybe.Maybe value
+    optionValue = get label option
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record :: Record record'
+    record = getOption proxy record' option
+
+    recordValue ::
+      Data.Maybe.Maybe value ->
+      result
+    recordValue = Record.get label record'
+
+    value :: result
+    value = recordValue optionValue
+else instance getOptionConsMaybe ::
+  ( Data.Symbol.IsSymbol label
+  , GetOption list givenRecord option record'
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) givenRecord' givenRecord
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Lacks label record'
+  ) =>
+  GetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) givenRecord option record where
+  getOption _ record' option = case optionValue of
+    Data.Maybe.Just _ -> Record.insert label optionValue record
+    Data.Maybe.Nothing -> Record.insert label recordValue record
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    optionValue :: Data.Maybe.Maybe value
+    optionValue = get label option
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record :: Record record'
+    record = getOption proxy record' option
+
+    recordValue :: Data.Maybe.Maybe value
+    recordValue = Record.get label record'
+else instance getOptionConsValue ::
+  ( Data.Symbol.IsSymbol label
+  , GetOption list givenRecord option record'
+  , Prim.Row.Cons label value givenRecord' givenRecord
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Lacks label record'
+  ) =>
+  GetOption (Prim.RowList.Cons label value list) givenRecord option record where
+  getOption _ record' option = case optionValue of
+    Data.Maybe.Just value -> Record.insert label value record
+    Data.Maybe.Nothing -> Record.insert label recordValue record
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    optionValue :: Data.Maybe.Maybe value
+    optionValue = get label option
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    record :: Record record'
+    record = getOption proxy record' option
+
+    recordValue :: value
+    recordValue = Record.get label record'
 
 -- | A typeclass that converts an `Option _` to a `Maybe (Record _)`.
 -- |
@@ -912,6 +1242,97 @@ else instance jsonCodecOptionCons ::
 
     proxy :: Proxy list
     proxy = Proxy
+
+-- | A typeclass that manipulates the values in an `Option _`.
+-- |
+-- | If the field exists in the `Option _`, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the `Option _`, there is no change to the `Option _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.modify'' { bar: \x -> x + 1 } someOption
+-- | ```
+class Modify (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
+  modify'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance manipulates the values in an `Option _`.
+instance modifyAny ::
+  ( ModifyOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Modify record option' option where
+  modify'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  modify'' record option = modifyOption (Proxy :: Proxy list) record option
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` manipulating values in an `Option _`.
+class ModifyOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option -> option', list option' -> option where
+  modifyOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance modifyOptionNil ::
+  ModifyOption Prim.RowList.Nil record option option where
+  modifyOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  modifyOption _ _ option = option
+else instance modifyOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , ModifyOption list record oldOption' option'
+  , Prim.Row.Cons label (value' -> value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  ) =>
+  ModifyOption (Prim.RowList.Cons label (value' -> value) list) record oldOption option where
+  modifyOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (value' -> value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  modifyOption _ record oldOption = case optionValue of
+    Data.Maybe.Just value -> insert label (recordValue value) option
+    Data.Maybe.Nothing -> case option of
+      Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = modifyOption proxy record oldOption'
+
+    optionValue :: Data.Maybe.Maybe value'
+    optionValue = get label oldOption
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    recordValue ::
+      value' ->
+      value
+    recordValue = Record.get label record
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
 class
@@ -1342,15 +1763,37 @@ else instance writeForeignOptionCons ::
     value' :: Data.Maybe.Maybe value
     value' = get label option
 
--- Do not export this value. It can be abused to invalidate invariants.
+-- | Manipulates the values of an option.
+-- |
+-- | If the field exists in the option, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the option, there is no change to the option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.alter { bar: \_ -> Data.Maybe.Just 41 } someOption
+-- | ```
 alter ::
+  forall option option' record.
+  Alter record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+alter record option = alter'' record option
+
+-- Do not export this value. It can be abused to invalidate invariants.
+alter' ::
   forall label option option' proxy value value'.
   Data.Symbol.IsSymbol label =>
   (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) ->
   proxy label ->
   Option option' ->
   { option :: Option option, value :: Data.Maybe.Maybe value }
-alter f proxy (Option object) = { option, value }
+alter' f proxy (Option object) = { option, value }
   where
   from :: forall a. Data.Maybe.Maybe a -> Data.Maybe.Maybe value'
   from = Unsafe.Coerce.unsafeCoerce
@@ -1391,10 +1834,27 @@ delete ::
   proxy label ->
   Option option' ->
   Option option
-delete proxy option = (alter go proxy option).option
+delete proxy option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Nothing
+
+-- | Removes the given key/values from an option
+-- |
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | anotherOption :: Option.Option ( bar :: Int )
+-- | anotherOption = Option.delete { foo: unit } someOption
+-- | ```
+delete' ::
+  forall option option' record.
+  Delete record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+delete' = delete''
 
 -- | Creates an option with no key/values that matches any type of option.
 -- |
@@ -1537,10 +1997,52 @@ get ::
   proxy label ->
   Option option ->
   Data.Maybe.Maybe value
-get proxy option = (alter go proxy option).value
+get proxy option = (alter' go proxy option).value
   where
   go :: Data.Maybe.Maybe value -> Data.Maybe.Maybe value
   go value = value
+
+-- | Attempts to fetch the values from the given option.
+-- |
+-- | The behavior of what's returned depends on what the value is for each field in the record.
+-- |
+-- | If the value in the record is of type `Maybe a -> b` ,
+-- | that function is run on the result of finding the field in the option.
+-- |
+-- | If the value in the record is of type `Maybe a` and the type of the field in the option is `a`,
+-- | the result is `Just _` if the value exists in the option and whatever the provided `Maybe a` was otherwise.
+-- |
+-- | If the value in the record is of type `a` and the type of the field in the option is `a`,
+-- | the result is whatever the value is in the option if it exists and whatever the provided `a` was otherwise.
+-- |
+-- | These behaviors allow handling different fields differently without jumping through hoops to get the values from an option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+-- | someOption = Option.empty
+-- |
+-- | -- Since `someOption` is empty,
+-- | -- this will have a shape like:
+-- | -- { foo: false, bar: "not set", qux: Data.Maybe.Nothing }
+-- | someRecord :: Record ( foo :: Boolean, bar :: String, qux :: Data.Maybe.Maybe String )
+-- | someRecord =
+-- |   Option.get'
+-- |     { foo: false
+-- |     , bar: \x -> case x of
+-- |         Data.Maybe.Just x -> if x > 0 then "positive" else "non-positive"
+-- |         Data.Maybe.Nothing -> "not set"
+-- |     , qux: Data.Maybe.Nothing
+-- |     }
+-- |     someOption
+-- | ```
+get' ::
+  forall option record record'.
+  Get record' option record =>
+  Record record' ->
+  Option option ->
+  Record record
+get' record option = get'' record option
 
 -- | Attempts to fetch all of the values from all of the keys of an option.
 -- |
@@ -1634,7 +2136,7 @@ insert ::
   value ->
   Option option' ->
   Option option
-insert proxy value option = (alter go proxy option).option
+insert proxy value option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
@@ -1704,12 +2206,34 @@ modify ::
   (value' -> value) ->
   Option option' ->
   Option option
-modify proxy f option = (alter go proxy option).option
+modify proxy f option = (alter' go proxy option).option
   where
   go :: Data.Maybe.Maybe value' -> Data.Maybe.Maybe value
   go value' = case value' of
     Data.Maybe.Just value -> Data.Maybe.Just (f value)
     Data.Maybe.Nothing -> Data.Maybe.Nothing
+
+-- | Manipulates the values of an option.
+-- |
+-- | If the field exists in the option, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the option, there is no change to the option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.modify' { bar: \x -> x + 1 } someOption
+-- | ```
+modify' ::
+  forall option option' record.
+  Modify record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+modify' record option = modify'' record option
 
 -- | Changes a key with the given value to an option.
 -- | The key must already exist in the option.
@@ -1736,7 +2260,7 @@ set ::
   value ->
   Option option' ->
   Option option
-set proxy value option = (alter go proxy option).option
+set proxy value option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
@@ -1841,6 +2365,27 @@ user14 = set' { age: Data.Maybe.Just 31 } user
 
 user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
+
+user16 :: User
+user16 = delete' {} user
+
+user17 :: Option ()
+user17 = delete' { age: unit, username: unit } user
+
+user18 :: Record ()
+user18 = get' {} user
+
+user19 :: Record ( age :: Int, username :: String )
+user19 = get' { age: 0, username: "anonymous" } user
+
+user20 :: Record ( age :: String, username :: Data.Maybe.Maybe String )
+user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just "anonymous" } user
+
+user21 :: Option ( age :: Boolean, username :: String )
+user21 = modify' { age: \_ -> true } user
+
+user22 :: Option ( age :: Boolean, username :: String )
+user22 = alter { age: \(_ :: Data.Maybe.Maybe Int) -> Data.Maybe.Just true } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecordWithRequired { title: "Mr.", name: "" }
