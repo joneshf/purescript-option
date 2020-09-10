@@ -58,6 +58,27 @@ spec = do
             Data.Maybe.Just value -> if value > 0 then "positive" else "non-positive"
             Data.Maybe.Nothing -> "not set"
         Option.get' { foo: false, bar, qux: Data.Maybe.Nothing } someOption `Test.Spec.Assert.shouldEqual` { foo: false, bar: "not set", qux: Data.Maybe.Nothing }
+    Test.Spec.describe "modify'" do
+      Test.Spec.it "does nothing if values are not set" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+          someOption = Option.empty
+
+          bar ::
+            Int ->
+            String
+          bar value = if value > 0 then "positive" else "non-positive"
+        Option.modify' { bar } someOption `Test.Spec.Assert.shouldEqual` Option.fromRecord {}
+      Test.Spec.it "manipulates all fields it can" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+          someOption = Option.fromRecord { bar: 31 }
+
+          bar ::
+            Int ->
+            String
+          bar value = if value > 0 then "positive" else "non-positive"
+        Option.modify' { bar } someOption `Test.Spec.Assert.shouldEqual` Option.fromRecord { bar: "positive" }
     Test.Spec.describe "set" do
       Test.Spec.it "sets a value when it doesn't exist" do
         let

@@ -27,6 +27,7 @@ module Option
   , insert'
   , jsonCodec
   , modify
+  , modify'
   , set
   , set'
   , toRecord
@@ -62,6 +63,10 @@ module Option
   , jsonCodec'
   , class JsonCodecOption
   , jsonCodecOption
+  , class Modify
+  , modify''
+  , class ModifyOption
+  , modifyOption
   , class OrdOption
   , compareOption
   , class ReadForeignOption
@@ -1142,6 +1147,97 @@ else instance jsonCodecOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
+-- | A typeclass that manipulates the values in an `Option _`.
+-- |
+-- | If the field exists in the `Option _`, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the `Option _`, there is no change to the `Option _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.modify'' { bar: \x -> x + 1 } someOption
+-- | ```
+class Modify (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
+  modify'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance manipulates the values in an `Option _`.
+instance modifyAny ::
+  ( ModifyOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Modify record option' option where
+  modify'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  modify'' record option = modifyOption (Proxy :: Proxy list) record option
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` manipulating values in an `Option _`.
+class ModifyOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option -> option', list option' -> option where
+  modifyOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance modifyOptionNil ::
+  ModifyOption Prim.RowList.Nil record option option where
+  modifyOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  modifyOption _ _ option = option
+else instance modifyOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , ModifyOption list record oldOption' option'
+  , Prim.Row.Cons label (value' -> value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  ) =>
+  ModifyOption (Prim.RowList.Cons label (value' -> value) list) record oldOption option where
+  modifyOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (value' -> value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  modifyOption _ record oldOption = case optionValue of
+    Data.Maybe.Just value -> insert label (recordValue value) option
+    Data.Maybe.Nothing -> case option of
+      Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    option :: Option option'
+    option = modifyOption proxy record oldOption'
+
+    optionValue :: Data.Maybe.Maybe value'
+    optionValue = get label oldOption
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    recordValue ::
+      value' ->
+      value
+    recordValue = Record.get label record
+
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
 class
   (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
@@ -1999,6 +2095,28 @@ modify proxy f option = (alter go proxy option).option
     Data.Maybe.Just value -> Data.Maybe.Just (f value)
     Data.Maybe.Nothing -> Data.Maybe.Nothing
 
+-- | Manipulates the values of an option.
+-- |
+-- | If the field exists in the option, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the option, there is no change to the option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.modify' { bar: \x -> x + 1 } someOption
+-- | ```
+modify' ::
+  forall option option' record.
+  Modify record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+modify' record option = modify'' record option
+
 -- | Changes a key with the given value to an option.
 -- | The key must already exist in the option.
 -- | If the key might not already exist in the option, `insert` should be used instead.
@@ -2144,6 +2262,9 @@ user19 = get' { age: 0, username: "anonymous" } user
 
 user20 :: Record ( age :: String, username :: Data.Maybe.Maybe String )
 user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just "anonymous" } user
+
+user21 :: Option ( age :: Boolean, username :: String )
+user21 = modify' { age: \_ -> true } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecordWithRequired { title: "Mr.", name: "" }
