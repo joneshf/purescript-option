@@ -17,6 +17,7 @@ module Option
   , fromRecord
   , fromRecordWithRequired
   , delete
+  , delete'
   , empty
   , get
   , getAll
@@ -30,6 +31,10 @@ module Option
   , toRecord
   , class DecodeJsonOption
   , decodeJsonOption
+  , class Delete
+  , delete''
+  , class DeleteOption
+  , deleteOption
   , class EncodeJsonOption
   , encodeJsonOption
   , class EqOption
@@ -262,6 +267,75 @@ else instance decodeJsonOptionCons ::
 
     option' :: Data.Either.Either String (Option option)
     option' = decodeJsonOption proxy object'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+-- | A typeclass that removes keys from an option
+-- |
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | anotherOption :: Option.Option ( bar :: Int )
+-- | anotherOption = Option.delete'' { foo: unit } someOption
+-- | ```
+class Delete (record :: # Type) (option' :: # Type) (option :: # Type) | record option' -> option, record option -> option', option' option -> record where
+  delete'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance removes keys from an `Option _`.
+instance deleteAny ::
+  ( DeleteOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Delete record option' option where
+  delete'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  delete'' = deleteOption (Proxy :: Proxy list)
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` removing keys from `Option _`.
+class DeleteOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, list option -> option' where
+  deleteOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance deleteOptionNil ::
+  DeleteOption Prim.RowList.Nil record option option where
+  deleteOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  deleteOption _ _ option = option
+else instance deleteOptionCons ::
+  ( Data.Symbol.IsSymbol label
+  , DeleteOption list record oldOption' option
+  , Prim.Row.Cons label value oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  ) =>
+  DeleteOption (Prim.RowList.Cons label Unit list) record oldOption option where
+  deleteOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label Unit list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  deleteOption _ record option' = deleteOption proxy record option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option :: Option oldOption'
+    option = delete label option'
 
     proxy :: Proxy list
     proxy = Proxy
@@ -1396,6 +1470,23 @@ delete proxy option = (alter go proxy option).option
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Nothing
 
+-- | Removes the given key/values from an option
+-- |
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.fromRecord { foo: true, bar: 31 }
+-- |
+-- | anotherOption :: Option.Option ( bar :: Int )
+-- | anotherOption = Option.delete { foo: unit } someOption
+-- | ```
+delete' ::
+  forall option option' record.
+  Delete record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+delete' = delete''
+
 -- | Creates an option with no key/values that matches any type of option.
 -- |
 -- | This can be useful as a starting point for an option that is later built up.
@@ -1841,6 +1932,12 @@ user14 = set' { age: Data.Maybe.Just 31 } user
 
 user15 :: User
 user15 = set' { age: Data.Maybe.Just 31, username: "pat" } user
+
+user16 :: User
+user16 = delete' {} user
+
+user17 :: Option ()
+user17 = delete' { age: unit, username: unit } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecordWithRequired { title: "Mr.", name: "" }
