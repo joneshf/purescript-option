@@ -14,6 +14,7 @@
 -- | Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
 module Option
   ( Option
+  , alter
   , fromRecord
   , fromRecordWithRequired
   , delete
@@ -31,6 +32,10 @@ module Option
   , set
   , set'
   , toRecord
+  , class Alter
+  , alter''
+  , class AlterOption
+  , alterOption
   , class DecodeJsonOption
   , decodeJsonOption
   , class Delete
@@ -229,6 +234,97 @@ instance writeForeignOptionOption ::
     Option option ->
     Foreign.Foreign
   writeImpl = writeForeignOption (Proxy :: Proxy list)
+
+-- | A typeclass that manipulates the values in an `Option _`.
+-- |
+-- | If the field exists in the `Option _`, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the `Option _`, there is no change to the `Option _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.alter'' { bar: \_ -> Data.Maybe.Just 41 } someOption
+-- | ```
+class Alter (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
+  alter'' ::
+    Record record ->
+    Option option' ->
+    Option option
+
+-- | This instance manipulates the values in an `Option _`.
+instance alterAny ::
+  ( AlterOption list record option' option
+  , Prim.RowList.RowToList record list
+  ) =>
+  Alter record option' option where
+  alter'' ::
+    Record record ->
+    Option option' ->
+    Option option
+  alter'' record option = alterOption (Proxy :: Proxy list) record option
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` manipulating values in an `Option _`.
+class AlterOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option -> option', list option' -> option where
+  alterOption ::
+    forall proxy.
+    proxy list ->
+    Record record ->
+    Option option' ->
+    Option option
+
+instance alterOptionNil ::
+  AlterOption Prim.RowList.Nil record option option where
+  alterOption ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Record record ->
+    Option option ->
+    Option option
+  alterOption _ _ option = option
+else instance alterOptionCons ::
+  ( AlterOption list record oldOption' option'
+  , Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label value' oldOption' oldOption
+  , Prim.Row.Lacks label oldOption'
+  , Prim.Row.Lacks label option'
+  ) =>
+  AlterOption (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) record oldOption option where
+  alterOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) ->
+    Record record ->
+    Option oldOption ->
+    Option option
+  alterOption _ record oldOption = case recordValue optionValue of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> case option of
+      Option object -> Option object
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldOption' :: Option oldOption'
+    oldOption' = delete label oldOption
+
+    optionValue :: Data.Maybe.Maybe value'
+    optionValue = get label oldOption
+
+    option :: Option option'
+    option = alterOption proxy record oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    recordValue ::
+      Data.Maybe.Maybe value' ->
+      Data.Maybe.Maybe value
+    recordValue = Record.get label record
 
 -- | A typeclass that iterates a `RowList` decoding an `Object Json` to an `Option _`.
 class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
@@ -1667,6 +1763,28 @@ else instance writeForeignOptionCons ::
     value' :: Data.Maybe.Maybe value
     value' = get label option
 
+-- | Manipulates the values of an option.
+-- |
+-- | If the field exists in the option, the given function is applied to the value.
+-- |
+-- | If the field does not exist in the option, there is no change to the option.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | someOption = Option.insert (Data.Symbol.SProxy :: _ "bar") 31 Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.alter { bar: \_ -> Data.Maybe.Just 41 } someOption
+-- | ```
+alter ::
+  forall option option' record.
+  Alter record option' option =>
+  Record record ->
+  Option option' ->
+  Option option
+alter record option = alter'' record option
+
 -- Do not export this value. It can be abused to invalidate invariants.
 alter' ::
   forall label option option' proxy value value'.
@@ -2265,6 +2383,9 @@ user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just 
 
 user21 :: Option ( age :: Boolean, username :: String )
 user21 = modify' { age: \_ -> true } user
+
+user22 :: Option ( age :: Boolean, username :: String )
+user22 = alter { age: \(_ :: Data.Maybe.Maybe Int) -> Data.Maybe.Just true } user
 
 testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
 testing = fromRecordWithRequired { title: "Mr.", name: "" }

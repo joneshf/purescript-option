@@ -24,6 +24,36 @@ reporters =
 spec :: Test.Spec.Spec Unit
 spec = do
   Test.Spec.describe "Option" do
+    Test.Spec.describe "alter" do
+      Test.Spec.it "does nothing if values are not set" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+          someOption = Option.empty
+
+          bar ::
+            Data.Maybe.Maybe Int ->
+            Data.Maybe.Maybe String
+          bar value' = case value' of
+            Data.Maybe.Just value -> if value > 0 then Data.Maybe.Just "positive" else Data.Maybe.Nothing
+            Data.Maybe.Nothing -> Data.Maybe.Nothing
+        Option.alter { bar } someOption `Test.Spec.Assert.shouldEqual` Option.fromRecord {}
+      Test.Spec.it "manipulates all fields it can" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+          someOption = Option.fromRecord { bar: 31, qux: "hi" }
+
+          bar ::
+            Data.Maybe.Maybe Int ->
+            Data.Maybe.Maybe String
+          bar value' = case value' of
+            Data.Maybe.Just value -> if value > 0 then Data.Maybe.Just "positive" else Data.Maybe.Nothing
+            Data.Maybe.Nothing -> Data.Maybe.Nothing
+
+          qux ::
+            Data.Maybe.Maybe String ->
+            Data.Maybe.Maybe String
+          qux _ = Data.Maybe.Nothing
+        Option.alter { bar, qux } someOption `Test.Spec.Assert.shouldEqual` Option.fromRecord { bar: "positive" }
     Test.Spec.describe "fromRecordWithRequired" do
       Test.Spec.it "requires correct fields" do
         let
