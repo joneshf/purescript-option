@@ -45,6 +45,19 @@ spec = do
               }
         option.required `Test.Spec.Assert.shouldEqual` { name: "Pat" }
         option.optional `Test.Spec.Assert.shouldEqual` Option.empty
+    Test.Spec.describe "get'" do
+      Test.Spec.it "gets all fields it can" do
+        let
+          someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+          someOption = Option.empty
+
+          bar ::
+            Data.Maybe.Maybe Int ->
+            String
+          bar value' = case value' of
+            Data.Maybe.Just value -> if value > 0 then "positive" else "non-positive"
+            Data.Maybe.Nothing -> "not set"
+        Option.get' { foo: false, bar, qux: Data.Maybe.Nothing } someOption `Test.Spec.Assert.shouldEqual` { foo: false, bar: "not set", qux: Data.Maybe.Nothing }
     Test.Spec.describe "set" do
       Test.Spec.it "sets a value when it doesn't exist" do
         let
