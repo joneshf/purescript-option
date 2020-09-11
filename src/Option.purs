@@ -303,8 +303,7 @@ else instance alterOptionCons ::
     Option option
   alterOption _ record oldOption = case recordValue optionValue of
     Data.Maybe.Just value -> insert label value option
-    Data.Maybe.Nothing -> case option of
-      Option object -> Option object
+    Data.Maybe.Nothing -> insertField label option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
@@ -363,8 +362,8 @@ else instance decodeJsonOptionCons ::
       option <- option'
       Data.Either.Right (insert label value option)
     Data.Maybe.Nothing -> do
-      Option object <- option'
-      Data.Either.Right (Option object)
+      option <- option'
+      Data.Either.Right (insertField label option)
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
@@ -1067,8 +1066,7 @@ else instance insertOptionConsMaybe ::
     Option option
   insertOption _ record oldOption = case value' of
     Data.Maybe.Just value -> insert label value option
-    Data.Maybe.Nothing -> case option of
-      Option object -> Option object
+    Data.Maybe.Nothing -> insertField label option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
@@ -1211,12 +1209,12 @@ else instance jsonCodecOptionCons ::
       Foreign.Object.Object Data.Argonaut.Core.Json ->
       Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option option)
     decode object' = do
-      option@(Option object) <- Data.Codec.Argonaut.decode option' object'
+      option <- Data.Codec.Argonaut.decode option' object'
       case Foreign.Object.lookup key object' of
         Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
           Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
           Data.Either.Right value -> Data.Either.Right (insert label value option)
-        Data.Maybe.Nothing -> Data.Either.Right (Option object)
+        Data.Maybe.Nothing -> Data.Either.Right (insertField label option)
 
     encode ::
       Option option ->
@@ -1314,8 +1312,7 @@ else instance modifyOptionCons ::
     Option option
   modifyOption _ record oldOption = case optionValue of
     Data.Maybe.Just value -> insert label (recordValue value) option
-    Data.Maybe.Nothing -> case option of
-      Option object -> Option object
+    Data.Maybe.Nothing -> insertField label option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
@@ -1426,7 +1423,7 @@ else instance readForeignOptionCons ::
     Foreign.Foreign ->
     Foreign.F (Option option)
   readImplOption _ foreign' = do
-    option@(Option object) <- option'
+    option <- option'
     case Foreign.Index.hasProperty key foreign' of
       true ->
         Control.Monad.Except.except case Control.Monad.Except.runExcept (Foreign.Index.readProp key foreign') of
@@ -1434,7 +1431,7 @@ else instance readForeignOptionCons ::
           Data.Either.Right value' -> case Control.Monad.Except.runExcept (Simple.JSON.readImpl value') of
             Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
             Data.Either.Right value -> Data.Either.Right (insert label value option)
-      false -> pure (Option object)
+      false -> pure (insertField label option)
     where
     key :: String
     key = Data.Symbol.reflectSymbol label
@@ -1518,8 +1515,7 @@ else instance setOptionConsMaybe ::
     Data.Maybe.Just value -> insert label value option
     Data.Maybe.Nothing -> case get label oldOption of
       Data.Maybe.Just value -> insert label value option
-      Data.Maybe.Nothing -> case option of
-        Option object -> Option object
+      Data.Maybe.Nothing -> insertField label option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
@@ -2144,6 +2140,35 @@ insert proxy value option = (alter' go proxy option).option
   where
   go :: forall a. a -> Data.Maybe.Maybe value
   go _ = Data.Maybe.Just value
+
+-- | Adds a new key with no value to an option.
+-- | The key must not already exist in the option.
+-- | If the key might already exist in the option, `set` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | anotherOption = Option.insertField (Data.Symbol.SProxy :: _ "bar") someOption
+-- | ```
+-- |
+-- | The `proxy` can be anything so long as its type variable has kind `Symbol`.
+-- |
+-- | It will commonly be `Data.Symbol.SProxy`, but doesn't have to be.
+insertField ::
+  forall label option option' proxy value.
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label value option' option =>
+  Prim.Row.Lacks label option' =>
+  proxy label ->
+  Option option' ->
+  Option option
+insertField proxy option = (alter' go proxy option).option
+  where
+  go :: forall a. a -> Data.Maybe.Maybe value
+  go _ = Data.Maybe.Nothing
 
 insert' ::
   forall option option' record.
