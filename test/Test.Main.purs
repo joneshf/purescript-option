@@ -3,6 +3,12 @@ module Test.Main (main) where
 import Prelude
 import Effect as Effect
 import Effect.Aff as Effect.Aff
+import HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptArgonaut as HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptArgonaut
+import HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptCodecArgonaut as HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptCodecArgonaut
+import HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON as HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON
+import HowTo.MakeAFunctionWithOptionalValues as HowTo.MakeAFunctionWithOptionalValues
+import HowTo.MakeAFunctionWithOptionalValuesFromARecord as HowTo.MakeAFunctionWithOptionalValuesFromARecord
+import HowTo.ProvideAnEasierAPIForDateTime as HowTo.ProvideAnEasierAPIForDateTime
 import Test.Option as Test.Option
 import Test.Spec as Test.Spec
 import Test.Spec.Reporter.Console as Test.Spec.Reporter.Console
@@ -22,3 +28,9 @@ reporters =
 spec :: Test.Spec.Spec Unit
 spec = do
   Test.Option.spec
+  HowTo.MakeAFunctionWithOptionalValues.spec
+  HowTo.MakeAFunctionWithOptionalValuesFromARecord.spec
+  HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptArgonaut.spec
+  HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptCodecArgonaut.spec
+  HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON.spec
+  HowTo.ProvideAnEasierAPIForDateTime.spec
