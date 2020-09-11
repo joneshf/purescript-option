@@ -347,8 +347,9 @@ instance decodeJsonOptionNil :: DecodeJsonOption Prim.RowList.Nil option where
 else instance decodeJsonOptionCons ::
   ( Data.Argonaut.Decode.Class.DecodeJson value
   , Data.Symbol.IsSymbol label
-  , DecodeJsonOption list option
+  , DecodeJsonOption list option'
   , Prim.Row.Cons label value option' option
+  , Prim.Row.Lacks label option'
   ) =>
   DecodeJsonOption (Prim.RowList.Cons label value list) option where
   decodeJsonOption ::
@@ -360,7 +361,7 @@ else instance decodeJsonOptionCons ::
     Data.Maybe.Just json -> do
       value <- Data.Argonaut.Decode.Class.decodeJson json
       option <- option'
-      Data.Either.Right (set label value option)
+      Data.Either.Right (insert label value option)
     Data.Maybe.Nothing -> do
       Option object <- option'
       Data.Either.Right (Option object)
@@ -371,7 +372,7 @@ else instance decodeJsonOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    option' :: Data.Either.Either String (Option option)
+    option' :: Data.Either.Either String (Option option')
     option' = decodeJsonOption proxy object'
 
     proxy :: Proxy list
@@ -688,9 +689,10 @@ instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option 
   fromRecordOption _ _ = empty
 else instance fromRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
-  , FromRecordOption list record option
+  , FromRecordOption list record option'
   , Prim.Row.Cons label value option' option
   , Prim.Row.Cons label value record' record
+  , Prim.Row.Lacks label option'
   ) =>
   FromRecordOption (Prim.RowList.Cons label value list) record option where
   fromRecordOption ::
@@ -698,12 +700,12 @@ else instance fromRecordOptionCons ::
     proxy (Prim.RowList.Cons label value list) ->
     Record record ->
     Option option
-  fromRecordOption _ record = set label value option
+  fromRecordOption _ record = insert label value option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option :: Option option
+    option :: Option option'
     option = fromRecordOption proxy record
 
     proxy :: Proxy list
@@ -1185,9 +1187,10 @@ instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option wh
       Data.Codec.Argonaut.record
 else instance jsonCodecOptionCons ::
   ( Data.Symbol.IsSymbol label
-  , JsonCodecOption list record option
+  , JsonCodecOption list record option'
   , Prim.Row.Cons label value' option' option
   , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value') record' record
+  , Prim.Row.Lacks label option'
   , Type.Equality.TypeEquals value (Data.Codec.Argonaut.JsonCodec value')
   ) =>
   JsonCodecOption (Prim.RowList.Cons label value list) record option where
@@ -1212,7 +1215,7 @@ else instance jsonCodecOptionCons ::
       case Foreign.Object.lookup key object' of
         Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
           Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
-          Data.Either.Right value -> Data.Either.Right (set label value option)
+          Data.Either.Right value -> Data.Either.Right (insert label value option)
         Data.Maybe.Nothing -> Data.Either.Right (Option object)
 
     encode ::
@@ -1228,7 +1231,7 @@ else instance jsonCodecOptionCons ::
             )
         Data.Maybe.Nothing -> pure unit
       Control.Monad.Writer.Class.tell
-        (Data.Codec.Argonaut.encode option' option)
+        (Data.Codec.Argonaut.encode option' (delete label option))
       pure option
 
     key :: String
@@ -1237,7 +1240,7 @@ else instance jsonCodecOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Data.Codec.Argonaut.JPropCodec (Option option)
+    option' :: Data.Codec.Argonaut.JPropCodec (Option option')
     option' = jsonCodecOption proxy record
 
     proxy :: Proxy list
@@ -1412,7 +1415,8 @@ instance readForeignOptionNil :: ReadForeignOption Prim.RowList.Nil option where
 else instance readForeignOptionCons ::
   ( Data.Symbol.IsSymbol label
   , Prim.Row.Cons label value option' option
-  , ReadForeignOption list option
+  , Prim.Row.Lacks label option'
+  , ReadForeignOption list option'
   , Simple.JSON.ReadForeign value
   ) =>
   ReadForeignOption (Prim.RowList.Cons label value list) option where
@@ -1429,7 +1433,7 @@ else instance readForeignOptionCons ::
           Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
           Data.Either.Right value' -> case Control.Monad.Except.runExcept (Simple.JSON.readImpl value') of
             Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
-            Data.Either.Right value -> Data.Either.Right (set label value option)
+            Data.Either.Right value -> Data.Either.Right (insert label value option)
       false -> pure (Option object)
     where
     key :: String
@@ -1438,7 +1442,7 @@ else instance readForeignOptionCons ::
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
 
-    option' :: Foreign.F (Option option)
+    option' :: Foreign.F (Option option')
     option' = readImplOption proxy foreign'
 
     proxy :: Proxy list
