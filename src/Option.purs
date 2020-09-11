@@ -1034,7 +1034,7 @@ instance insertAny ::
   insert'' = insertOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` inserting values in an `Option _`.
-class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list -> record where
+class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, option' record -> option where
   insertOption ::
     forall proxy.
     proxy list ->
@@ -1481,7 +1481,7 @@ instance setAny ::
   set'' = setOption (Proxy :: Proxy list)
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
-class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list -> record where
+class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, option' record -> option where
   setOption ::
     forall proxy.
     proxy list ->
