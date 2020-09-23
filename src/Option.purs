@@ -91,6 +91,7 @@ module Option
   ) where
 
 import Prelude
+import Prim hiding (Record)
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
 import Control.Monad.Writer as Control.Monad.Writer
@@ -251,7 +252,7 @@ instance writeForeignOptionOption ::
 -- | ```
 class Alter (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
   alter'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -262,7 +263,7 @@ instance alterAny ::
   ) =>
   Alter record option' option where
   alter'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   alter'' record option = alterOption (Proxy :: Proxy list) record option
@@ -272,7 +273,7 @@ class AlterOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: 
   alterOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -281,7 +282,7 @@ instance alterOptionNil ::
   alterOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   alterOption _ _ option = option
@@ -298,7 +299,7 @@ else instance alterOptionCons ::
   alterOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   alterOption _ record oldOption = case recordValue optionValue of
@@ -388,7 +389,7 @@ else instance decodeJsonOptionCons ::
 -- | ```
 class Delete (record :: # Type) (option' :: # Type) (option :: # Type) | record option' -> option, record option -> option', option' option -> record where
   delete'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -399,7 +400,7 @@ instance deleteAny ::
   ) =>
   Delete record option' option where
   delete'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   delete'' = deleteOption (Proxy :: Proxy list)
@@ -409,7 +410,7 @@ class DeleteOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   deleteOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -418,7 +419,7 @@ instance deleteOptionNil ::
   deleteOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   deleteOption _ _ option = option
@@ -432,7 +433,7 @@ else instance deleteOptionCons ::
   deleteOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label Unit list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   deleteOption _ record option' = deleteOption proxy record option
@@ -638,10 +639,10 @@ class FromRecord (record :: # Type) (required :: # Type) (optional :: # Type) wh
   -- | option5 = Option.fromRecord' { foo: true, bar: 31 }
   -- | ```
   fromRecord' ::
-    Record record ->
-    Record
+    Prim.Record record ->
+    Prim.Record
       ( optional :: Option optional
-      , required :: Record required
+      , required :: Prim.Record required
       )
 
 -- | This instance converts a record into an option.
@@ -658,10 +659,10 @@ instance fromRecordAny ::
   ) =>
   FromRecord record required optional where
   fromRecord' ::
-    Record record ->
-    Record
+    Prim.Record record ->
+    Prim.Record
       ( optional :: Option optional
-      , required :: Record required
+      , required :: Prim.Record required
       )
   fromRecord' record =
     { optional: fromRecordOption (Proxy :: Proxy optionalList) record
@@ -676,14 +677,14 @@ class FromRecordOption (list :: Prim.RowList.RowList) (record :: # Type) (option
   fromRecordOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option
 
 instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option where
   fromRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option
   fromRecordOption _ _ = empty
 else instance fromRecordOptionCons ::
@@ -697,7 +698,7 @@ else instance fromRecordOptionCons ::
   fromRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option option
   fromRecordOption _ record = insert label value option
     where
@@ -721,15 +722,15 @@ class FromRecordRequired (list :: Prim.RowList.RowList) (record :: # Type) (requ
   fromRecordRequired ::
     forall proxy.
     proxy list ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record required)
 
 instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
   fromRecordRequired ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record ())
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record ())
   fromRecordRequired _ _ = identity
 else instance fromRecordRequiredCons ::
   ( Data.Symbol.IsSymbol label
@@ -742,11 +743,11 @@ else instance fromRecordRequiredCons ::
   fromRecordRequired ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record required)
   fromRecordRequired _ record = first <<< rest
     where
-    first :: Record.Builder.Builder (Record required') (Record required)
+    first :: Record.Builder.Builder (Prim.Record required') (Prim.Record required)
     first = Record.Builder.insert label value
 
     label :: Data.Symbol.SProxy label
@@ -755,7 +756,7 @@ else instance fromRecordRequiredCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record ()) (Record required')
+    rest :: Record.Builder.Builder (Prim.Record ()) (Prim.Record required')
     rest = fromRecordRequired proxy record
 
     value :: value
@@ -799,9 +800,9 @@ class Get (record' :: # Type) (option :: # Type) (record :: # Type) | option rec
   -- |     someOption
   -- | ```
   get'' ::
-    Record record' ->
+    Prim.Record record' ->
     Option option ->
-    Record record
+    Prim.Record record
 
 -- | This instance converts grabs the given fields of an `Option _`.
 instance getAny ::
@@ -819,9 +820,9 @@ class GetOption (list :: Prim.RowList.RowList) (record' :: # Type) (option :: # 
   getOption ::
     forall proxy.
     proxy list ->
-    Record record' ->
+    Prim.Record record' ->
     Option option ->
-    Record record
+    Prim.Record record
 
 instance getOptionNil ::
   GetOption Prim.RowList.Nil record' option () where
@@ -846,7 +847,7 @@ else instance getOptionConsFunction ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue ::
@@ -878,7 +879,7 @@ else instance getOptionConsMaybe ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue :: Data.Maybe.Maybe value
@@ -905,7 +906,7 @@ else instance getOptionConsValue ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue :: value
@@ -946,7 +947,7 @@ class GetAll (option :: # Type) (record :: # Type) | option -> record where
   -- | ```
   getAll' ::
     Option option ->
-    Data.Maybe.Maybe (Record record)
+    Data.Maybe.Maybe (Prim.Record record)
 
 -- | This instancce converts an `Option _` to a `Maybe (Record _)`.
 -- |
@@ -969,7 +970,7 @@ class GetAllOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: 
     forall proxy.
     proxy list ->
     Option option ->
-    Data.Maybe.Maybe (Record record)
+    Data.Maybe.Maybe (Prim.Record record)
 
 instance getAllOptionNil ::
   GetAllOption Prim.RowList.Nil option () where
@@ -994,7 +995,7 @@ else instance getAllOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record' :: Data.Maybe.Maybe (Record record')
+    record' :: Data.Maybe.Maybe (Prim.Record record')
     record' = getAllOption proxy option
 
     value' :: Data.Maybe.Maybe value
@@ -1016,7 +1017,7 @@ else instance getAllOptionCons ::
 -- | ```
 class Insert (record :: # Type) (option' :: # Type) (option :: # Type) where
   insert'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1027,7 +1028,7 @@ instance insertAny ::
   ) =>
   Insert record option' option where
   insert'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   insert'' = insertOption (Proxy :: Proxy list)
@@ -1037,7 +1038,7 @@ class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   insertOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1046,7 +1047,7 @@ instance insertOptionNil ::
   insertOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   insertOption _ _ option = option
@@ -1061,7 +1062,7 @@ else instance insertOptionConsMaybe ::
   insertOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   insertOption _ record oldOption = case value' of
@@ -1090,7 +1091,7 @@ else instance insertOptionConsValue ::
   insertOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   insertOption _ record oldOption = insert label value option
@@ -1133,7 +1134,7 @@ class JsonCodec (record :: # Type) (option :: # Type) where
   -- | ```
   jsonCodec' ::
     String ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JsonCodec (Option option)
 
 -- | This instance ignores keys that do not exist in the given JSON object and does not insert keys that do not exist in the given `Option _`.
@@ -1154,7 +1155,7 @@ instance jsonCodecOptionAny ::
   JsonCodec record option where
   jsonCodec' ::
     String ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JsonCodec (Option option)
   jsonCodec' name record =
     Data.Codec.Argonaut.object
@@ -1169,14 +1170,14 @@ class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option 
   jsonCodecOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
 
 instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option where
   jsonCodecOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ _ =
     Data.Codec.mapCodec
@@ -1195,7 +1196,7 @@ else instance jsonCodecOptionCons ::
   jsonCodecOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ record =
     Data.Codec.GCodec
@@ -1260,7 +1261,7 @@ else instance jsonCodecOptionCons ::
 -- | ```
 class Modify (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
   modify'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1271,7 +1272,7 @@ instance modifyAny ::
   ) =>
   Modify record option' option where
   modify'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   modify'' record option = modifyOption (Proxy :: Proxy list) record option
@@ -1281,7 +1282,7 @@ class ModifyOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   modifyOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1290,7 +1291,7 @@ instance modifyOptionNil ::
   modifyOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   modifyOption _ _ option = option
@@ -1307,7 +1308,7 @@ else instance modifyOptionCons ::
   modifyOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (value' -> value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   modifyOption _ record oldOption = case optionValue of
@@ -1461,7 +1462,7 @@ else instance readForeignOptionCons ::
 -- | ```
 class Set (record :: # Type) (option' :: # Type) (option :: # Type) where
   set'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1472,7 +1473,7 @@ instance setAny ::
   ) =>
   Set record option' option where
   set'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   set'' = setOption (Proxy :: Proxy list)
@@ -1482,7 +1483,7 @@ class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # 
   setOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1491,7 +1492,7 @@ instance setOptionNil ::
   setOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   setOption _ _ option = option
@@ -1508,7 +1509,7 @@ else instance setOptionConsMaybe ::
   setOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   setOption _ record oldOption = case value' of
@@ -1544,7 +1545,7 @@ else instance setOptionCons ::
   setOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   setOption _ record oldOption = insert label value option
@@ -1641,7 +1642,7 @@ class ToRecord (option :: # Type) (record :: # Type) | option -> record where
   -- | ```
   toRecord' ::
     Option option ->
-    Record record
+    Prim.Record record
 
 -- | This instance converts an option into a record.
 -- |
@@ -1656,7 +1657,7 @@ instance toRecordAny ::
   ToRecord option record where
   toRecord' ::
     Option option ->
-    Record record
+    Prim.Record record
   toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
@@ -1668,7 +1669,7 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record record)
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record record)
 
 instance toRecordOptionNil ::
   ToRecordOption Prim.RowList.Nil option () where
@@ -1676,7 +1677,7 @@ instance toRecordOptionNil ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record ())
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record ())
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
@@ -1690,10 +1691,10 @@ else instance toRecordOptionCons ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record record)
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record record)
   toRecordOption _ option = first <<< rest
     where
-    first :: Record.Builder.Builder (Record record') (Record record)
+    first :: Record.Builder.Builder (Prim.Record record') (Prim.Record record)
     first = Record.Builder.insert label value
 
     label :: Data.Symbol.SProxy label
@@ -1702,7 +1703,7 @@ else instance toRecordOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record ()) (Record record')
+    rest :: Record.Builder.Builder (Prim.Record ()) (Prim.Record record')
     rest = toRecordOption proxy option
 
     value :: Data.Maybe.Maybe value
@@ -1780,7 +1781,7 @@ else instance writeForeignOptionCons ::
 alter ::
   forall option option' record.
   Alter record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 alter record option = alter'' record option
@@ -1851,7 +1852,7 @@ delete proxy option = (alter' go proxy option).option
 delete' ::
   forall option option' record.
   Delete record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 delete' = delete''
@@ -1895,14 +1896,14 @@ empty = Option Foreign.Object.empty
 fromRecord ::
   forall option record.
   FromRecord record () option =>
-  Record record ->
+  Prim.Record record ->
   Option option
 fromRecord record = result.optional
   where
   result ::
-    Record
+    Prim.Record
       ( optional :: Option option
-      , required :: Record ()
+      , required :: Prim.Record ()
       )
   result = fromRecord' record
 
@@ -1965,10 +1966,10 @@ fromRecord record = result.optional
 fromRecordWithRequired ::
   forall option required record.
   FromRecord record required option =>
-  Record record ->
-  Record
+  Prim.Record record ->
+  Prim.Record
     ( optional :: Option option
-    , required :: Record required
+    , required :: Prim.Record required
     )
 fromRecordWithRequired = fromRecord'
 
@@ -2039,9 +2040,9 @@ get proxy option = (alter' go proxy option).value
 get' ::
   forall option record record'.
   Get record' option record =>
-  Record record' ->
+  Prim.Record record' ->
   Option option ->
-  Record record
+  Prim.Record record
 get' record option = get'' record option
 
 -- | Attempts to fetch all of the values from all of the keys of an option.
@@ -2067,7 +2068,7 @@ getAll ::
   forall option record.
   GetAll option record =>
   Option option ->
-  Data.Maybe.Maybe (Record record)
+  Data.Maybe.Maybe (Prim.Record record)
 getAll = getAll'
 
 -- | Attempts to fetch the value at the given key from an option falling back to the default.
@@ -2173,7 +2174,7 @@ insertField proxy option = (alter' go proxy option).option
 insert' ::
   forall option option' record.
   Insert record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 insert' = insert''
@@ -2204,7 +2205,7 @@ jsonCodec ::
   forall option record.
   JsonCodec record option =>
   String ->
-  Record record ->
+  Prim.Record record ->
   Data.Codec.Argonaut.JsonCodec (Option option)
 jsonCodec = jsonCodec'
 
@@ -2259,7 +2260,7 @@ modify proxy f option = (alter' go proxy option).option
 modify' ::
   forall option option' record.
   Modify record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 modify' record option = modify'' record option
@@ -2309,7 +2310,7 @@ set proxy value option = (alter' go proxy option).option
 set' ::
   forall option option' record.
   Set record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 set' = set''
@@ -2330,7 +2331,7 @@ toRecord ::
   forall option record.
   ToRecord option record =>
   Option option ->
-  Record record
+  Prim.Record record
 toRecord = toRecord'
 
 -- Sanity checks
@@ -2401,13 +2402,13 @@ user16 = delete' {} user
 user17 :: Option ()
 user17 = delete' { age: unit, username: unit } user
 
-user18 :: Record ()
+user18 :: Prim.Record ()
 user18 = get' {} user
 
-user19 :: Record ( age :: Int, username :: String )
+user19 :: Prim.Record ( age :: Int, username :: String )
 user19 = get' { age: 0, username: "anonymous" } user
 
-user20 :: Record ( age :: String, username :: Data.Maybe.Maybe String )
+user20 :: Prim.Record ( age :: String, username :: Data.Maybe.Maybe String )
 user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just "anonymous" } user
 
 user21 :: Option ( age :: Boolean, username :: String )
