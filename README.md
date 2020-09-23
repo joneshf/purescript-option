@@ -21,12 +21,26 @@ Records capture the idea of a collection of key/value pairs where every key and 
 E.g. `Record (foo :: Boolean, bar :: Int)` means that both `foo` and `bar` exist and with values all of the time.
 
 Variants capture the idea of a collection of key/value pairs where exactly one of the key/value pairs exist.
-E.g. `Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
+E.g. `Data.Variant.Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
 
 Options capture the idea of a collection of key/value pairs where any key and value may or may not exist.
-E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
+E.g. `Option.Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
 
 The distinction between these data types means that we can describe problems more accurately.
+Options are typically what you find in dynamic languages or in weakly-typed static languages.
+Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
+
+These data types are all specific to the PureScript language.
+Different data types exist in other languages that combine some of these ideas.
+In many languages records are a combination of both PureScript-style records and PureScript-style options.
+E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
+
+Other languages might signify optional fields with a question mark.
+E.g. In TypeScript, the previous example would be `{ foo: boolean; bar?: number }`
+
+This is different from a required field with an optional value.
+In PureScript, we might signify that by using: `Record (foo :: Boolean, bar :: Data.Maybe.Maybe Int)`.
+In TypeScript, we might signify that by using: `{ foo: boolean; bar: number | null }`
 
 ## How To: Make a function with optional values
 

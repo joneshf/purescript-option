@@ -15,9 +15,10 @@ spec :: Test.Spec.Spec Unit
 spec =
   Test.Spec.describe "Test.Option" do
     spec_alter
-    spec_fromRecordWithRequired
     spec_get'
     spec_modify'
+    spec_recordFromRecord
+    spec_recordToRecord
     spec_set
     spec_set'
 
@@ -53,30 +54,6 @@ spec_alter =
           Data.Maybe.Maybe String
         qux _ = Data.Maybe.Nothing
       Option.alter { bar, qux } someOption `Test.Spec.Assertions.shouldEqual` Option.fromRecord { bar: "positive" }
-
-spec_fromRecordWithRequired :: Test.Spec.Spec Unit
-spec_fromRecordWithRequired =
-  Test.Spec.describe "fromRecordWithRequired" do
-    Test.Spec.it "requires correct fields" do
-      let
-        option ::
-          Record
-            ( optional ::
-                Option.Option
-                  ( greeting :: String
-                  , title :: String
-                  )
-            , required ::
-                Record
-                  ( name :: String
-                  )
-            )
-        option =
-          Option.fromRecordWithRequired
-            { name: "Pat"
-            }
-      option.required `Test.Spec.Assertions.shouldEqual` { name: "Pat" }
-      option.optional `Test.Spec.Assertions.shouldEqual` Option.empty
 
 spec_get' :: Test.Spec.Spec Unit
 spec_get' =
@@ -117,6 +94,44 @@ spec_modify' =
           String
         bar value = if value > 0 then "positive" else "non-positive"
       Option.modify' { bar } someOption `Test.Spec.Assertions.shouldEqual` Option.fromRecord { bar: "positive" }
+
+spec_recordFromRecord :: Test.Spec.Spec Unit
+spec_recordFromRecord =
+  Test.Spec.describe "recordFromRecord" do
+    Test.Spec.it "requires correct fields" do
+      let
+        record ::
+          Option.Record
+            ( name :: String
+            )
+            ( greeting :: String
+            , title :: String
+            )
+        record =
+          Option.recordFromRecord
+            { name: "Pat"
+            }
+      Option.required record `Test.Spec.Assertions.shouldEqual` { name: "Pat" }
+      Option.optional record `Test.Spec.Assertions.shouldEqual` Option.empty
+
+spec_recordToRecord :: Test.Spec.Spec Unit
+spec_recordToRecord =
+  Test.Spec.describe "recordToRecord" do
+    Test.Spec.it "requires correct fields" do
+      let
+        record ::
+          Option.Record
+            ( name :: String
+            )
+            ( greeting :: String
+            , title :: String
+            )
+        record =
+          Option.recordFromRecord
+            { name: "Pat"
+            , title: "Dr."
+            }
+      Option.recordToRecord record `Test.Spec.Assertions.shouldEqual` { greeting: Data.Maybe.Nothing, name: "Pat", title: Data.Maybe.Just "Dr." }
 
 spec_set :: Test.Spec.Spec Unit
 spec_set =

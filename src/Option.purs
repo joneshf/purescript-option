@@ -4,16 +4,29 @@
 -- | E.g. `Record (foo :: Boolean, bar :: Int)` means that both `foo` and `bar` exist and with values all of the time.
 -- |
 -- | Variants capture the idea of a collection of key/value pairs where exactly one of the key/value pairs exist.
--- | E.g. `Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
+-- | E.g. `Data.Variant.Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
 -- |
 -- | Options capture the idea of a collection of key/value pairs where any key and value may or may not exist.
--- | E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
+-- | E.g. `Option.Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
 -- |
 -- | The distinction between these data types means that we can describe problems more accurately.
 -- | Options are typically what you find in dynamic languages or in weakly-typed static languages.
 -- | Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
+-- |
+-- | These data types are all specific to the PureScript language.
+-- | Different data types exist in other languages that combine some of these ideas.
+-- | In many languages records are a combination of both PureScript-style records and PureScript-style options.
+-- | E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
+-- |
+-- | Other languages might signify optional fields with a question mark.
+-- | E.g. In TypeScript, the previous example would be `{ foo: boolean; bar?: number }`
+-- |
+-- | This is different from a required field with an optional value.
+-- | In PureScript, we might signify that by using: `Record (foo :: Boolean, bar :: Data.Maybe.Maybe Int)`.
+-- | In TypeScript, we might signify that by using: `{ foo: boolean; bar: number | null }`
 module Option
   ( Option
+  , Record
   , alter
   , fromRecord
   , fromRecordWithRequired
@@ -29,6 +42,10 @@ module Option
   , jsonCodec
   , modify
   , modify'
+  , optional
+  , recordFromRecord
+  , recordToRecord
+  , required
   , set
   , set'
   , toRecord
@@ -113,6 +130,7 @@ import Foreign.Index as Foreign.Index
 import Foreign.Object as Foreign.Object
 import Prim.Row as Prim.Row
 import Prim.RowList as Prim.RowList
+import Prim.TypeError as Prim.TypeError
 import Record as Record
 import Record.Builder as Record.Builder
 import Simple.JSON as Simple.JSON
@@ -235,6 +253,14 @@ instance writeForeignOptionOption ::
     Option option ->
     Foreign.Foreign
   writeImpl = writeForeignOption (Proxy :: Proxy list)
+
+-- | A combination of both language-level records and options.
+-- | E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
+newtype Record (required :: # Type) (optional :: # Type)
+  = Record
+  { required :: Prim.Record required
+  , optional :: Option optional
+  }
 
 -- | A typeclass that manipulates the values in an `Option _`.
 -- |
@@ -588,62 +614,35 @@ class FromRecord (record :: # Type) (required :: # Type) (optional :: # Type) wh
   -- |
   -- | E.g. The following definitions are valid.
   -- | ```PureScript
-  -- | option1 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option1 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option1 = Option.fromRecord' { foo: true, bar: 31 }
   -- |
-  -- | option2 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option2 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option2 = Option.fromRecord' {}
   -- |
-  -- | option3 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( bar :: Int )
-  -- |     , required :: Record ( foo :: Boolean )
-  -- |     )
+  -- | option3 :: Option.Record ( foo :: Boolean ) ( bar :: Int )
   -- | option3 = Option.fromRecord' { foo: true }
   -- | ```
   -- |
   -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
   -- | ```PureScript
   -- | -- This will not work as it has the extra field `baz`
-  -- | option3 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option3 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option3 = Option.fromRecord' { foo: true, bar: 31, baz: "hi" }
   -- |
   -- | -- This will not work as it has the extra field `qux`
-  -- | option4 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option4 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option4 = Option.fromRecord' { qux: [] }
   -- | ```
   -- |
   -- | And, this definition is not valid as the given record lacks the required fields.
   -- | ```PureScript
-  -- | option5 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ( baz :: String )
-  -- |     )
+  -- | option5 :: Option.Record ( baz :: String ) ( foo :: Boolean, bar :: Int )
   -- | option5 = Option.fromRecord' { foo: true, bar: 31 }
   -- | ```
   fromRecord' ::
     Prim.Record record ->
-    Prim.Record
-      ( optional :: Option optional
-      , required :: Prim.Record required
-      )
+    Record required optional
 
 -- | This instance converts a record into an option.
 -- |
@@ -660,14 +659,12 @@ instance fromRecordAny ::
   FromRecord record required optional where
   fromRecord' ::
     Prim.Record record ->
-    Prim.Record
-      ( optional :: Option optional
-      , required :: Prim.Record required
-      )
+    Record required optional
   fromRecord' record =
-    { optional: fromRecordOption (Proxy :: Proxy optionalList) record
-    , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
-    }
+    recordFromRecordAndOption
+      { optional: fromRecordOption (Proxy :: Proxy optionalList) record
+      , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
+      }
 
 -- | A typeclass that iterates a `RowList` converting a `Record _` into an `Option _`.
 class FromRecordOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
@@ -1615,9 +1612,10 @@ else instance showOptionCons ::
     value' :: Data.Maybe.Maybe value
     value' = get label option
 
--- | A typeclass for converting an `Option _` into a `Record _`.
+-- | A typeclass for converting an `Option.Record _ _` into a `Record _`.
 -- |
--- | Since there is syntax for operating on records, but no syntax for operating on options, this typeclass can be useful for providing an easier to use interface to options.
+-- | Since there is syntax for operating on records, but no syntax for operating on `Option.Record _ _`.
+-- | This typeclass can be useful for providing an easier to use interface to `Option.Record _ _`.
 -- |
 -- | E.g. Someone can say:
 -- | ```PureScript
@@ -1629,36 +1627,53 @@ else instance showOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class ToRecord (option :: # Type) (record :: # Type) | option -> record where
-  -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
+class ToRecord (required :: # Type) (optional :: # Type) (record :: # Type) | optional required -> record where
+  -- | The expected `Record record` will have the same fields as the given `Option.Record required optional` where each optional type is wrapped in a `Maybe`.
   -- |
   -- | E.g.
   -- | ```PureScript
-  -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | someOption :: Option.Record ( foo :: Boolean ) ( bar :: Int )
   -- | someOption = Option.fromRecord' { foo: true, bar: 31 }
   -- |
-  -- | someRecord :: Record ( foo :: Data.Maybe.Maybe Boolean, bar :: Data.Maybe.Maybe Int )
+  -- | someRecord :: Record ( foo :: Boolean, bar :: Data.Maybe.Maybe Int )
   -- | someRecord = Option.toRecord' someOption
   -- | ```
   toRecord' ::
-    Option option ->
+    Record required optional ->
     Prim.Record record
 
--- | This instance converts an option into a record.
+-- | This instance converts an `Option.Record _ _` into a `Record _`.
 -- |
--- | Every field in the option is added to a record with a `Maybe _` type.
+-- | Every required field in the `Option.Record _ _` is added to the `Record _` with a `_` type.
+-- | Every optional field in the `Option.Record _ _` is added to the `Record _` with a `Maybe _` type.
 -- |
--- | All fields in the option that exist will have the value `Just _`.
--- | All fields in the option that do not exist will have the value `Nothing`.
+-- | All optional fields in the `Option.Record _ _` that exist will have the value `Just _`.
+-- | All optional fields in the `Option.Record _ _` that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption list option record
-  , Prim.RowList.RowToList record list
+  ( Prim.Row.Nub record record
+  , Prim.Row.Union required optionalRecord record
+  , Prim.RowList.RowToList optional optionalList
+  , ToRecordOption optionalList optional optionalRecord
   ) =>
-  ToRecord option record where
+  ToRecord required optional record where
   toRecord' ::
-    Option option ->
+    Record required optional ->
     Prim.Record record
-  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
+  toRecord' record =
+    Record.Builder.build
+      ( requiredBuilder
+          <<< optionalBuilder
+      )
+      {}
+    where
+    optionalBuilder :: Record.Builder.Builder (Prim.Record ()) (Prim.Record optionalRecord)
+    optionalBuilder = toRecordOption optionalProxy (optional record)
+
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
+
+    requiredBuilder :: Record.Builder.Builder (Prim.Record optionalRecord) (Prim.Record record)
+    requiredBuilder = Record.Builder.disjointUnion (required record)
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
 class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: # Type) | list -> option record where
@@ -1686,10 +1701,10 @@ else instance toRecordOptionCons ::
   , Prim.Row.Lacks label record'
   , ToRecordOption list option record'
   ) =>
-  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
+  ToRecordOption (Prim.RowList.Cons label value list) option record where
   toRecordOption ::
     forall proxy.
-    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    proxy (Prim.RowList.Cons label value list) ->
     Option option ->
     Record.Builder.Builder (Prim.Record ()) (Prim.Record record)
   toRecordOption _ option = first <<< rest
@@ -1894,18 +1909,14 @@ empty = Option Foreign.Object.empty
 -- | option4 = Option.fromRecord { qux: [] }
 -- | ```
 fromRecord ::
-  forall option record.
-  FromRecord record () option =>
+  forall optional record.
+  FromRecord record () optional =>
   Prim.Record record ->
-  Option option
-fromRecord record = result.optional
+  Option optional
+fromRecord record' = optional record
   where
-  result ::
-    Prim.Record
-      ( optional :: Option option
-      , required :: Prim.Record ()
-      )
-  result = fromRecord' record
+  record :: Record () optional
+  record = fromRecord' record'
 
 -- | The given `Record record` must have no more fields than expected.
 -- |
@@ -1916,21 +1927,21 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option1 = Option.fromRecord { foo: true, bar: 31 }
+-- | option1 = Option.fromRecordWithRequired { foo: true, bar: 31 }
 -- |
 -- | option2 ::
 -- |   Record
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option2 = Option.fromRecord {}
+-- | option2 = Option.fromRecordWithRequired {}
 -- |
 -- | option3 ::
 -- |   Record
 -- |     ( optional :: Option.Option ( bar :: Int )
 -- |     , required :: Record ( foo :: Boolean )
 -- |     )
--- | option3 = Option.fromRecord { foo: true }
+-- | option3 = Option.fromRecordWithRequired { foo: true }
 -- | ```
 -- |
 -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
@@ -1941,7 +1952,7 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option3 = Option.fromRecord { foo: true, bar: 31, baz: "hi" }
+-- | option3 = Option.fromRecordWithRequired { foo: true, bar: 31, baz: "hi" }
 -- |
 -- | -- This will not work as it has the extra field `qux`
 -- | option4 ::
@@ -1949,7 +1960,7 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option4 = Option.fromRecord { qux: [] }
+-- | option4 = Option.fromRecordWithRequired { qux: [] }
 -- | ```
 -- |
 -- | And, this definition is not valid as the given record lacks the required fields.
@@ -1959,19 +1970,30 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ( baz :: String )
 -- |     )
--- | option5 = Option.fromRecord { foo: true, bar: 31 }
+-- | option5 = Option.fromRecordWithRequired { foo: true, bar: 31 }
 -- | ```
 -- |
 -- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
 fromRecordWithRequired ::
-  forall option required record.
-  FromRecord record required option =>
+  forall optional record required.
+  FromRecord record required optional =>
+  Prim.TypeError.Warn
+    ( Prim.TypeError.Above
+        (Prim.TypeError.Text "`Option.fromRecordWithRequired` is deprecated and will be removed in v6.0.0.")
+        (Prim.TypeError.Text "Use `Option.recordFromRecord` instead.")
+    ) =>
   Prim.Record record ->
   Prim.Record
-    ( optional :: Option option
+    ( optional :: Option optional
     , required :: Prim.Record required
     )
-fromRecordWithRequired = fromRecord'
+fromRecordWithRequired record' =
+  { optional: optional record
+  , required: required record
+  }
+  where
+  record :: Record required optional
+  record = fromRecord' record'
 
 -- | Attempts to fetch the value at the given key from an option.
 -- |
@@ -2265,6 +2287,110 @@ modify' ::
   Option option
 modify' record option = modify'' record option
 
+-- | Retrieves all the optional fields from the given `Option.Record _ _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int, qux :: String )
+-- | someRecord = Option.recordFromRecord { foo: false }
+-- |
+-- | someOption :: Option.Option ( bar :: Int, qux :: String )
+-- | someOption = Option.optional someRecord
+-- | ```
+optional ::
+  forall required optional.
+  Record required optional ->
+  Option optional
+optional record' = case record' of
+  Record record -> record.optional
+
+-- | The given `Record record` must have no more fields than expected.
+-- |
+-- | E.g. The following definitions are valid.
+-- | ```PureScript
+-- | option1 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option1 = Option.recordFromRecord { foo: true, bar: 31 }
+-- |
+-- | option2 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option2 = Option.recordFromRecord {}
+-- |
+-- | option3 :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | option3 = Option.recordFromRecord { foo: true }
+-- | ```
+-- |
+-- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
+-- | ```PureScript
+-- | -- This will not work as it has the extra field `baz`
+-- | option3 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option3 = Option.recordFromRecord { foo: true, bar: 31, baz: "hi" }
+-- |
+-- | -- This will not work as it has the extra field `qux`
+-- | option4 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option4 = Option.recordFromRecord { qux: [] }
+-- | ```
+-- |
+-- | And, this definition is not valid as the given record lacks the required fields.
+-- | ```PureScript
+-- | option5 :: Option.Record ( baz :: String ) ( foo :: Boolean, bar :: Int )
+-- | option5 = Option.recordFromRecord { foo: true, bar: 31 }
+-- | ```
+-- |
+-- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
+recordFromRecord ::
+  forall optional required record.
+  FromRecord record required optional =>
+  Prim.Record record ->
+  Record required optional
+recordFromRecord record = fromRecord' record
+
+recordFromRecordAndOption ::
+  forall optional required.
+  { optional :: Option optional
+  , required :: Prim.Record required
+  } ->
+  Record required optional
+recordFromRecordAndOption record =
+  Record
+    { optional: record.optional
+    , required: record.required
+    }
+
+-- | The expected `Record record` will have the same fields as the given `Option.Record required optional` where each optional type is wrapped in a `Maybe`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someOption = Option.recordFromRecord { foo: true, bar: 31 }
+-- |
+-- | someRecord :: Record ( foo :: Boolean, bar :: Data.Maybe.Maybe Int )
+-- | someRecord = Option.toRecord someOption
+-- | ```
+-- |
+-- | This is an alias for `toRecord'` so the documentation is a bit clearer.
+recordToRecord ::
+  forall optional record required.
+  ToRecord required optional record =>
+  Record required optional ->
+  Prim.Record record
+recordToRecord record = toRecord' record
+
+-- | Retrieves all of the required fields from the given `Option.Record _ _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean, bar :: Int ) ( qux :: String )
+-- | someRecord = Option.recordFromRecord { foo: false, bar: 3 }
+-- |
+-- | anotherRecord :: Record ( foo :: Boolean, bar :: Int )
+-- | anotherRecord = Option.required someRecord
+-- | ```
+required ::
+  forall required optional.
+  Record required optional ->
+  Prim.Record required
+required record' = case record' of
+  Record record -> record.required
+
 -- | Changes a key with the given value to an option.
 -- | The key must already exist in the option.
 -- | If the key might not already exist in the option, `insert` should be used instead.
@@ -2325,14 +2451,19 @@ set' = set''
 -- | someRecord :: Record ( foo :: Data.Maybe.Maybe Boolean, bar :: Data.Maybe.Maybe Int )
 -- | someRecord = Option.toRecord someOption
 -- | ```
--- |
--- | This is an alias for `toRecord'` so the documentation is a bit clearer.
 toRecord ::
-  forall option record.
-  ToRecord option record =>
-  Option option ->
+  forall optional record.
+  ToRecord () optional record =>
+  Option optional ->
   Prim.Record record
-toRecord = toRecord'
+toRecord option = toRecord' record
+  where
+  record :: Record () optional
+  record =
+    recordFromRecordAndOption
+      { optional: option
+      , required: {}
+      }
 
 -- Sanity checks
 -- These are in this module so things are always checked.
@@ -2417,5 +2548,11 @@ user21 = modify' { age: \_ -> true } user
 user22 :: Option ( age :: Boolean, username :: String )
 user22 = alter { age: \(_ :: Data.Maybe.Maybe Int) -> Data.Maybe.Just true } user
 
-testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
-testing = fromRecordWithRequired { title: "Mr.", name: "" }
+type Greeting
+  = Record ( name :: String ) ( title :: String )
+
+greeting1 :: Greeting
+greeting1 = recordFromRecord { name: "Pat" }
+
+greeting2 :: Greeting
+greeting2 = recordFromRecord { name: "Pat", title: "Dr." }
