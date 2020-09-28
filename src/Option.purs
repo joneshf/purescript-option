@@ -123,6 +123,8 @@ import Data.Either as Data.Either
 import Data.List as Data.List
 import Data.Maybe as Data.Maybe
 import Data.Profunctor.Star as Data.Profunctor.Star
+import Data.Show as Data.Show
+import Data.String as Data.String
 import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
 import Foreign as Foreign
@@ -134,6 +136,7 @@ import Prim.TypeError as Prim.TypeError
 import Record as Record
 import Record.Builder as Record.Builder
 import Simple.JSON as Simple.JSON
+import Type.Data.RowList as Type.Data.RowList
 import Type.Equality as Type.Equality
 import Unsafe.Coerce as Unsafe.Coerce
 
@@ -261,6 +264,49 @@ newtype Record (required :: # Type) (optional :: # Type)
   { required :: Prim.Record required
   , optional :: Option optional
   }
+
+instance showRecord ::
+  ( Data.Show.ShowRecordFields requiredList required
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
+  , ShowOption optionalList optional
+  ) =>
+  Show (Record required optional) where
+  show ::
+    Record required optional ->
+    String
+  show record' = "(Option.recordFromRecord {" <> go <> "})"
+    where
+    go :: String
+    go = case requiredFields of
+      [] -> case optionalFields of
+        Data.List.Cons x Data.List.Nil -> " " <> x <> " "
+        Data.List.Cons x y -> " " <> go' x y <> " "
+        Data.List.Nil -> ""
+      fields -> case optionalFields of
+        Data.List.Cons x Data.List.Nil -> " " <> Data.String.joinWith ", " fields <> ", " <> x <> " "
+        Data.List.Cons x y -> " " <> Data.String.joinWith ", " fields <> ", " <> go' x y <> " "
+        Data.List.Nil -> " " <> Data.String.joinWith ", " fields <> " "
+
+    go' ::
+      String ->
+      Data.List.List String ->
+      String
+    go' acc fields' = case fields' of
+      Data.List.Cons field fields -> go' (acc <> ", " <> field) fields
+      Data.List.Nil -> acc
+
+    optionalFields :: Data.List.List String
+    optionalFields = showOption optionalProxy (optional record')
+
+    optionalProxy :: Type.Data.RowList.RLProxy optionalList
+    optionalProxy = Type.Data.RowList.RLProxy
+
+    requiredFields :: Array String
+    requiredFields = Data.Show.showRecordFields requiredProxy (required record')
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
 
 -- | A typeclass that manipulates the values in an `Option _`.
 -- |
