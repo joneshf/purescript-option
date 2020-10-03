@@ -12,6 +12,7 @@ A data type for optional values.
 * [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
+* [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
 * [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
 * [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
@@ -861,6 +862,174 @@ We get the behavior we expect:
 "{\"name\":\"Pat\"}"
 
 > writeJSON' {name: Data.Maybe.Just "Pat", title: Data.Maybe.Just "Dr."}
+"{\"title\":\"Dr.\",\"name\":\"Pat\"}"
+```
+
+## How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`
+
+Another common pattern with JSON objects is that some keys always have to be present while others do not.
+Some APIs make the distinction between a JSON object like `{ "name": "Pat" }` and one like `{ "name": "Pat", "title": null }`.
+In the first case, it might recognize that the `"title"` key does not exist, and behave in a different way from the `"title"` key having a value of `null`.
+In the second case, it might notice that the `"title"` key exists and work with the value assuming it's good to go; the `null` might eventually cause a failure later.
+
+In many cases, what we want is to not generate any fields that do not exist.
+Using `purescript-argonaut`, `Option.Record _ _` can help with that idea:
+
+```PureScript
+import Prelude
+import Data.Argonaut.Core as Data.Argonaut.Core
+import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
+import Data.Either as Data.Either
+import Option as Option
+
+decode ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either String (Option.Record ( name :: String ) ( title :: String ))
+decode = Data.Argonaut.Decode.Class.decodeJson
+
+encode ::
+  Option.Record ( name :: String ) ( title :: String ) ->
+  Data.Argonaut.Core.Json
+encode = Data.Argonaut.Encode.Class.encodeJson
+```
+
+We can give that a spin with some different JSON values:
+```PureScript
+> decode =<< Data.Argonaut.Parser.jsonParser """{}"""
+(Left "JSON was missing expected field: name")
+
+> decode =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
+(Left "JSON was missing expected field: name")
+
+> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
+(Right (Option.recordFromRecord { name: "Pat" }))
+
+> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+(Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+```
+
+We can also produce some different JSON values:
+
+```PureScript
+> Data.Argonaut.Core.stringify (encode (Option.recordFromRecord { name: "Pat" }))
+"{\"name\":\"Pat\"}"
+
+> Data.Argonaut.Core.stringify (encode (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+"{\"title\":\"Dr.\",\"name\":\"Pat\"}"
+```
+
+Notice that we don't end up with a `"title"` field in the JSON output unless we have a `title` field in our record.
+
+It might be instructive to compare how we might write a similar functions using a `Record _` instead of `Option.Record _ _`:
+With `purescript-argonaut`, the instances for decoding and encoding on records expect the field to always exist no matter its value.
+If we attempt to go directly to `Record ( name :: String, title :: Data.Maybe.Maybe String )`:
+
+```PureScript
+import Data.Argonaut.Core as Data.Argonaut.Core
+import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
+import Data.Either as Data.Either
+import Data.Maybe as Data.Maybe
+
+decode' ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+decode' = Data.Argonaut.Decode.Class.decodeJson
+
+encode' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  Data.Argonaut.Core.Json
+encode' = Data.Argonaut.Encode.Class.encodeJson
+```
+
+We won't get the behavior we expect:
+
+```PureScript
+> decode' =<< Data.Argonaut.Parser.jsonParser """{}"""
+(Left "JSON was missing expected field: title")
+
+> decode' =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
+(Left "JSON was missing expected field: name")
+
+> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
+(Left "JSON was missing expected field: title")
+
+> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+(Right { name: "Pat", title: (Just "Dr.") })
+
+> Data.Argonaut.Core.stringify (encode' { name: "Pat", title: Data.Maybe.Nothing })
+"{\"title\":null,\"name\":\"Pat\"}"
+
+> Data.Argonaut.Core.stringify (encode' { name: "Pat", title: Data.Maybe.Just "Dr." })
+"{\"title\":\"Dr.\",\"name\":\"Pat\"}"
+```
+
+Unless both fields exist, we cannot decode the JSON object.
+Similarly, no matter what the values are, we always encode them into a JSON object.
+
+In order to emulate the behavior of an optional field, we have to name the record, and write our own instances:
+```PureScript
+import Prelude
+import Data.Argonaut.Core as Data.Argonaut.Core
+import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Decode.Combinators as Data.Argonaut.Decode.Combinators
+import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
+import Data.Argonaut.Encode.Combinators as Data.Argonaut.Encode.Combinators
+import Data.Either as Data.Either
+import Data.Generic.Rep as Data.Generic.Rep
+import Data.Generic.Rep.Show as Data.Generic.Rep.Show
+import Data.Maybe as Data.Maybe
+
+newtype Greeting
+  = Greeting
+  ( Record
+      ( name :: String
+      , title :: Data.Maybe.Maybe String
+      )
+  )
+
+derive instance genericGreeting :: Data.Generic.Rep.Generic Greeting _
+
+instance showGreeting :: Show Greeting where
+  show = Data.Generic.Rep.Show.genericShow
+
+instance decodeJsonGreeting :: Data.Argonaut.Decode.Class.DecodeJson Greeting where
+  decodeJson json = do
+    object <- Data.Argonaut.Decode.Class.decodeJson json
+    name <- Data.Argonaut.Decode.Combinators.getField object "name"
+    title <- Data.Argonaut.Decode.Combinators.getFieldOptional object "title"
+    pure (Greeting { name, title })
+
+instance encodeJsonGreeting :: Data.Argonaut.Encode.Class.EncodeJson Greeting where
+  encodeJson (Greeting { name, title }) =
+    Data.Argonaut.Encode.Combinators.extend
+      (Data.Argonaut.Encode.Combinators.assoc "name" name)
+      ( Data.Argonaut.Encode.Combinators.extendOptional
+          (Data.Argonaut.Encode.Combinators.assocOptional "title" title)
+          (Data.Argonaut.Core.jsonEmptyObject)
+      )
+```
+
+If we try decoding and encoding now, we get something closer to what we wanted:
+
+```PureScript
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{}""" :: Data.Either.Either String Greeting
+(Left "JSON was missing expected field: name")
+
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}""" :: Data.Either.Either String Greeting
+(Left "JSON was missing expected field: name")
+
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}""" :: Data.Either.Either String Greeting
+(Right (Greeting { name: "Pat", title: Nothing }))
+
+> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}""" :: Data.Either.Either String Greeting
+(Right (Greeting { name: "Pat", title: (Just "Dr.") }))
+
+> Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: "Pat", title: Data.Maybe.Nothing }))
+"{\"name\":\"Pat\"}"
+
+> Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: "Pat", title: Data.Maybe.Just "Dr." }))
 "{\"title\":\"Dr.\",\"name\":\"Pat\"}"
 ```
 

@@ -276,6 +276,83 @@ derive newtype instance ordRecordRequiredOptional ::
   ) =>
   Ord (Record required optional)
 
+-- | For required fields:
+-- |
+-- | If a key does not exist in the JSON object, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given JSON object.
+-- |
+-- | If a key does not exist in the JSON object, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+instance decodeJsonRecordRequiredOptional ::
+  ( Data.Argonaut.Decode.Class.DecodeJson (Option optional)
+  , Data.Argonaut.Decode.Class.DecodeJson (Prim.Record required)
+  ) =>
+  Data.Argonaut.Decode.Class.DecodeJson (Record required optional) where
+  decodeJson ::
+    Data.Argonaut.Core.Json ->
+    Data.Either.Either String (Record required optional)
+  decodeJson json = case Data.Argonaut.Decode.Class.decodeJson json of
+    Data.Either.Left error -> Data.Either.Left error
+    Data.Either.Right required' -> case Data.Argonaut.Decode.Class.decodeJson json of
+      Data.Either.Left error -> Data.Either.Left error
+      Data.Either.Right optional' ->
+        Data.Either.Right
+          ( recordFromRecordAndOption
+              { optional: optional'
+              , required: required'
+              }
+          )
+
+-- | For required fields:
+-- |
+-- | Every key in the given `Option.Record _ _` is encoded like normal and added to the JSON object.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the JSON object.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it encodes it like normal and adds it to the JSON object.
+instance encodeJsonRecordRequiredOptional ::
+  ( Data.Argonaut.Encode.Class.GEncodeJson required requiredList
+  , EncodeJsonOption optionalList optional
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
+  ) =>
+  Data.Argonaut.Encode.Class.EncodeJson (Record required optional) where
+  encodeJson ::
+    Record required optional ->
+    Data.Argonaut.Core.Json
+  encodeJson record =
+    Data.Argonaut.Core.fromObject
+      ( Foreign.Object.union
+          requiredJSON
+          optionalJSON
+      )
+    where
+    optionalJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
+    optionalJSON = encodeJsonOption optionalProxy (optional record)
+
+    optionalProxy :: Type.Data.RowList.RLProxy optionalList
+    optionalProxy = Type.Data.RowList.RLProxy
+
+    requiredJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
+    requiredJSON = Data.Argonaut.Encode.Class.gEncodeJson (required record) requiredProxy
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
+
 instance showRecord ::
   ( Data.Show.ShowRecordFields requiredList required
   , Prim.RowList.RowToList optional optionalList
