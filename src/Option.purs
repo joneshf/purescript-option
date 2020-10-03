@@ -116,7 +116,6 @@ import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
-import Data.Argonaut.Encode.Combinators as Data.Argonaut.Encode.Combinators
 import Data.Codec as Data.Codec
 import Data.Codec.Argonaut as Data.Codec.Argonaut
 import Data.Either as Data.Either
@@ -182,7 +181,7 @@ instance encodeJsonOptionOption ::
   encodeJson ::
     Option option ->
     Data.Argonaut.Core.Json
-  encodeJson = encodeJsonOption (Proxy :: Proxy list)
+  encodeJson option = Data.Argonaut.Core.fromObject (encodeJsonOption (Proxy :: Proxy list) option)
 
 instance eqOptionOption ::
   ( EqOption list option
@@ -540,7 +539,7 @@ class EncodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list 
     forall proxy.
     proxy list ->
     Option option ->
-    Data.Argonaut.Core.Json
+    Foreign.Object.Object Data.Argonaut.Core.Json
 
 instance encodeJsonOptionNil ::
   EncodeJsonOption Prim.RowList.Nil option where
@@ -548,8 +547,8 @@ instance encodeJsonOptionNil ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option option ->
-    Data.Argonaut.Core.Json
-  encodeJsonOption _ _ = Data.Argonaut.Core.jsonEmptyObject
+    Foreign.Object.Object Data.Argonaut.Core.Json
+  encodeJsonOption _ _ = Foreign.Object.empty
 else instance encodeJsonOptionCons ::
   ( Data.Argonaut.Encode.Class.EncodeJson value
   , Data.Symbol.IsSymbol label
@@ -561,18 +560,16 @@ else instance encodeJsonOptionCons ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
     Option option ->
-    Data.Argonaut.Core.Json
+    Foreign.Object.Object Data.Argonaut.Core.Json
   encodeJsonOption _ option = case value' of
     Data.Maybe.Just value ->
-      Data.Argonaut.Encode.Combinators.extend
-        ( Data.Argonaut.Encode.Combinators.assoc
-            key
-            (Data.Argonaut.Encode.Class.encodeJson value)
-        )
+      Foreign.Object.insert
+        key
+        (Data.Argonaut.Encode.Class.encodeJson value)
         json
     Data.Maybe.Nothing -> json
     where
-    json :: Data.Argonaut.Core.Json
+    json :: Foreign.Object.Object Data.Argonaut.Core.Json
     json = encodeJsonOption proxy option
 
     key :: String
