@@ -13,6 +13,7 @@ A data type for optional values.
 * [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
 * [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
+* [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
 * [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
 * [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
@@ -1031,6 +1032,336 @@ If we try decoding and encoding now, we get something closer to what we wanted:
 
 > Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: "Pat", title: Data.Maybe.Just "Dr." }))
 "{\"title\":\"Dr.\",\"name\":\"Pat\"}"
+```
+
+## How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`
+
+Another common pattern with JSON objects is that some keys always have to be present while others do not.
+Some APIs make the distinction between a JSON object like `{ "name": "Pat" }` and one like `{ "name": "Pat", "title": null }`.
+In the first case, it might recognize that the `"title"` key does not exist, and behave in a different way from the `"title"` key having a value of `null`.
+In the second case, it might notice that the `"title"` key exists and work with the value assuming it's good to go; the `null` might eventually cause a failure later.
+
+In many cases, what we want is to not generate any fields that do not exist.
+Using `purescript-codec-argonaut`, `Option.Record _ _` can help with that idea:
+
+```PureScript
+import Data.Codec.Argonaut as Data.Codec.Argonaut
+import Option as Option
+
+jsonCodec :: Data.Codec.Argonaut.JsonCodec (Option.Record ( name :: String ) ( title :: String ))
+jsonCodec =
+  Option.jsonCodecRecord
+    "Greeting"
+    { name: Data.Codec.Argonaut.string
+    , title: Data.Codec.Argonaut.string
+    }
+```
+
+We can add a couple of helpers to make decoding/encoding easier in the REPL:
+
+```PureScript
+import Prelude
+import Data.Argonaut.Core as Data.Argonaut.Core
+import Data.Argonaut.Parser as Data.Argonaut.Parser
+import Data.Codec.Argonaut as Data.Codec.Argonaut
+import Data.Either as Data.Either
+import Option as Option
+
+decode ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option.Record ( name :: String ) ( title :: String ))
+decode = Data.Codec.Argonaut.decode jsonCodec
+
+encode ::
+  Option.Record ( name :: String ) ( title :: String ) ->
+  Data.Argonaut.Core.Json
+encode = Data.Codec.Argonaut.encode jsonCodec
+
+parse ::
+  String ->
+  Data.Either.Either String (Option.Record ( name :: String ) ( title :: String ))
+parse string = do
+  json <- Data.Argonaut.Parser.jsonParser string
+  case decode json of
+    Data.Either.Left err -> Data.Either.Left (Data.Codec.Argonaut.printJsonDecodeError err)
+    Data.Either.Right record -> Data.Either.Right record
+```
+
+We can give that a spin with some different JSON values:
+
+```PureScript
+> parse """{}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key name:\n  No value was found.")
+
+> parse """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key name:\n  No value was found.")
+
+> parse """{"name": "Pat"}"""
+(Right (Option.recordFromRecord { name: "Pat" }))
+
+> parse """{"name": "Pat", "title": "Dr."}"""
+(Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+```
+
+Notice that we have to supply a `"name"` field in the JSON input otherwise it will not parse.
+
+We can also produce some different JSON values:
+
+```PureScript
+> Data.Argonaut.Core.stringify (encode (Option.recordFromRecord { name: "Pat" }))
+"{\"name\":\"Pat\"}"
+
+> Data.Argonaut.Core.stringify (encode (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+"{\"name\":\"Pat\",\"title\":\"Dr.\"}"
+```
+
+Notice that we don't end up with a `"title"` field in the JSON output unless we have a `title` field in our record.
+
+It might be instructive to compare how we might write a similar functions using a `Record _` instead of `Option.Record _`:
+With `purescript-codec-argonaut`, there are a couple of codecs that ship with the package for records: `Data.Codec.Argonaut.recordProp` and `Data.Codec.Argonaut.Record.record`.
+Each of those codecs expect the field to always exist no matter its value.
+The difference between those codecs is not very relevant except to say that the latter requires less characters to use.
+There are also a couple of codecs that ship with the package for `Data.Maybe.Maybe _`: `Data.Codec.Argonaut.Common.maybe` and `Data.Codec.Argonaut.Compat.maybe`.
+The former decodes/encodes with tagged values, the latter with `null`s.
+If we attempt to go directly to `Record ( name :: String, title :: Data.Maybe.Maybe String )` and `Data.Codec.Argonaut.Common.maybe`:
+
+```PureScript
+import Prelude
+import Data.Argonaut.Core as Data.Argonaut.Core
+import Data.Argonaut.Parser as Data.Argonaut.Parser
+import Data.Codec.Argonaut as Data.Codec.Argonaut
+import Data.Codec.Argonaut.Common as Data.Codec.Argonaut.Common
+import Data.Codec.Argonaut.Compat as Data.Codec.Argonaut.Compat
+import Data.Codec.Argonaut.Record as Data.Codec.Argonaut.Record
+import Data.Either as Data.Either
+import Data.Maybe as Data.Maybe
+
+decode' ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+decode' = Data.Codec.Argonaut.decode jsonCodec'
+
+encode' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  Data.Argonaut.Core.Json
+encode' = Data.Codec.Argonaut.encode jsonCodec'
+
+jsonCodec' :: Data.Codec.Argonaut.JsonCodec (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+jsonCodec' =
+  Data.Codec.Argonaut.Record.object
+    "Greeting"
+    { name: Data.Codec.Argonaut.string
+    , title: Data.Codec.Argonaut.Common.maybe Data.Codec.Argonaut.string
+    }
+
+parse' ::
+  String ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+parse' string = do
+  json <- Data.Argonaut.Parser.jsonParser string
+  case decode' json of
+    Data.Either.Left err -> Data.Either.Left (Data.Codec.Argonaut.printJsonDecodeError err)
+    Data.Either.Right option -> Data.Either.Right option
+```
+
+We won't get the behavior we expect:
+
+```PureScript
+> parse' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  No value was found.")
+
+> parse' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  Under 'Maybe':\n  Expected value of type 'Object'.")
+
+> parse' """{"name": "Pat"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  No value was found.")
+
+> parse' """{"name": "Pat", "title": "Dr."}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  Under 'Maybe':\n  Expected value of type 'Object'.")
+
+> parse' """{"name": "Pat", "title": {"tag": "Just", "value": "Dr."}}"""
+(Right { name: "Pat", title: (Just "Dr.") })
+
+> Data.Argonaut.Core.stringify (encode' { name: "Pat", title: Data.Maybe.Nothing })
+"{\"name\":\"Pat\",\"title\":{\"tag\":\"Nothing\"}}"
+
+> Data.Argonaut.Core.stringify (encode' { name: "Pat", title: Data.Maybe.Just "Dr." })
+"{\"name\":\"Pat\",\"title\":{\"tag\":\"Just\",\"value\":\"Dr.\"}}"
+```
+
+Unless both fields exist, we cannot decode the JSON object.
+Not only is every field required, they're serialized as tagged values.
+Similarly, no matter what the optional values are, we always encode them into a JSON object.
+
+If we try with `Data.Codec.Argonaut.Compat.maybe`:
+
+```PureScript
+decode'' ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+decode'' = Data.Codec.Argonaut.decode jsonCodec''
+
+encode'' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  Data.Argonaut.Core.Json
+encode'' = Data.Codec.Argonaut.encode jsonCodec''
+
+jsonCodec'' :: Data.Codec.Argonaut.JsonCodec (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+jsonCodec'' =
+  Data.Codec.Argonaut.Record.object
+    "Greeting"
+    { name: Data.Codec.Argonaut.string
+    , title: Data.Codec.Argonaut.Compat.maybe Data.Codec.Argonaut.string
+    }
+
+parse'' ::
+  String ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+parse'' string = do
+  json <- Data.Argonaut.Parser.jsonParser string
+  case decode'' json of
+    Data.Either.Left err -> Data.Either.Left (Data.Codec.Argonaut.printJsonDecodeError err)
+    Data.Either.Right option -> Data.Either.Right option
+```
+
+We also don't get the behavior we expect:
+
+```PureScript
+> parse'' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  No value was found.")
+
+> parse'' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key name:\n  No value was found.")
+
+> parse'' """{"name": "Pat"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key title:\n  No value was found.")
+
+> parse'' """{"name": "Pat", "title": "Dr."}"""
+(Right { name: "Pat", title: (Just "Dr.") })
+
+> Data.Argonaut.Core.stringify (encode'' { name: "Pat", title: Data.Maybe.Nothing })
+"{\"name\":\"Pat\",\"title\":null}"
+
+> Data.Argonaut.Core.stringify (encode'' { name: "Pat", title: Data.Maybe.Just "Dr." })
+"{\"name\":\"Pat\",\"title\":\"Dr.\"}"
+```
+
+Unless both fields exist, we cannot decode the JSON object.
+Similarly, no matter what the optional values are, we always encode them into a JSON object.
+
+In order to emulate the behavior of an optional field, we have to use a different codec:
+
+```PureScript
+import Prelude
+import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
+import Control.Monad.Writer as Control.Monad.Writer
+import Control.Monad.Writer.Class as Control.Monad.Writer.Class
+import Data.Codec as Data.Codec
+import Data.List as Data.List
+import Data.Profunctor.Star as Data.Profunctor.Star
+import Data.Symbol as Data.Symbol
+import Data.Tuple as Data.Tuple
+import Foreign.Object as Foreign.Object
+import Prim.Row as Prim.Row
+import Record as Record
+
+optionalField ::
+  forall label record record' value.
+  Data.Symbol.IsSymbol label =>
+  Prim.Row.Cons label (Data.Maybe.Maybe value) record' record =>
+  Prim.Row.Lacks label record' =>
+  Data.Symbol.SProxy label ->
+  Data.Codec.Argonaut.JsonCodec value ->
+  Data.Codec.Argonaut.JPropCodec (Record record') ->
+  Data.Codec.Argonaut.JPropCodec (Record record)
+optionalField label codecValue codecRecord =
+  Data.Codec.GCodec
+    (Control.Monad.Reader.Trans.ReaderT decodeField)
+    (Data.Profunctor.Star.Star encodeField)
+  where
+  decodeField ::
+    Foreign.Object.Object Data.Argonaut.Core.Json ->
+    Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record record)
+  decodeField object' = do
+    record <- Data.Codec.Argonaut.decode codecRecord object'
+    case Foreign.Object.lookup key object' of
+      Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codecValue json of
+        Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
+        Data.Either.Right value -> Data.Either.Right (Record.insert label (Data.Maybe.Just value) record)
+      Data.Maybe.Nothing -> Data.Either.Right (Record.insert label Data.Maybe.Nothing record)
+
+  encodeField ::
+    Record record ->
+    Control.Monad.Writer.Writer (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)) (Record record)
+  encodeField record = do
+    case Record.get label record of
+      Data.Maybe.Just value ->
+        Control.Monad.Writer.Class.tell
+          ( Data.List.Cons
+              (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codecValue value))
+              Data.List.Nil
+          )
+      Data.Maybe.Nothing -> pure unit
+    Control.Monad.Writer.Class.tell
+      (Data.Codec.Argonaut.encode codecRecord (Record.delete label record))
+    pure record
+
+  key :: String
+  key = Data.Symbol.reflectSymbol label
+```
+
+With this codec defined, we can implement a codec for the record with required and optional fields:
+
+```PureScript
+decode''' ::
+  Data.Argonaut.Core.Json ->
+  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+decode''' = Data.Codec.Argonaut.decode jsonCodec'''
+
+encode''' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  Data.Argonaut.Core.Json
+encode''' = Data.Codec.Argonaut.encode jsonCodec'''
+
+jsonCodec''' :: Data.Codec.Argonaut.JsonCodec (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+jsonCodec''' =
+  Data.Codec.Argonaut.object
+    "Greeting"
+    ( Data.Codec.Argonaut.recordProp (Data.Symbol.SProxy :: _ "name") Data.Codec.Argonaut.string
+        $ optionalField (Data.Symbol.SProxy :: _ "title") Data.Codec.Argonaut.string
+        $ Data.Codec.Argonaut.record
+    )
+
+parse''' ::
+  String ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+parse''' string = do
+  json <- Data.Argonaut.Parser.jsonParser string
+  case decode''' json of
+    Data.Either.Left err -> Data.Either.Left (Data.Codec.Argonaut.printJsonDecodeError err)
+    Data.Either.Right option -> Data.Either.Right option
+```
+
+If we try decoding and encoding now, we get something closer to what we wanted:
+
+```PureScript
+> parse''' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key name:\n  No value was found.")
+
+> parse''' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  Under 'Greeting':\n  At object key name:\n  No value was found.")
+
+> parse''' """{"name": "Pat"}"""
+(Right { name: "Pat", title: Nothing })
+
+> parse''' """{"name": "Pat", "title": "wonderful"}"""
+(Right { name: "Pat", title: (Just "wonderful") })
+
+> Data.Argonaut.Core.stringify (encode''' { name: "Pat", title: Data.Maybe.Nothing })
+"{\"name\":\"Pat\"}"
+
+> Data.Argonaut.Core.stringify (encode''' { name: "Pat", title: Data.Maybe.Just "Dr." })
+"{\"name\":\"Pat\",\"title\":\"Dr.\"}"
 ```
 
 ## How To: Provide an easier API for `DateTime`

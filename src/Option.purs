@@ -40,6 +40,7 @@ module Option
   , insert
   , insert'
   , jsonCodec
+  , jsonCodecRecord
   , modify
   , modify'
   , optional
@@ -85,6 +86,8 @@ module Option
   , jsonCodec'
   , class JsonCodecOption
   , jsonCodecOption
+  , class JsonCodecRequired
+  , jsonCodecRequired
   , class Modify
   , modify''
   , class ModifyOption
@@ -136,7 +139,6 @@ import Record as Record
 import Record.Builder as Record.Builder
 import Simple.JSON as Simple.JSON
 import Type.Data.RowList as Type.Data.RowList
-import Type.Equality as Type.Equality
 import Unsafe.Coerce as Unsafe.Coerce
 
 -- | A collection of key/value pairs where any key and value may or may not exist.
@@ -1237,25 +1239,26 @@ else instance insertOptionConsValue ::
     value :: value
     value = Record.get label record
 
--- | A typeclass that converts a record of `JsonCodec`s into a `JsonCodec` for an option.
+-- | A typeclass that converts a record of `Data.Codec.Argonaut.JsonCodec _`s into a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _`.
 -- |
--- | This is useful to provide a straight-forward `JsonCodec` for an `Option _`.
-class JsonCodec (record :: # Type) (option :: # Type) where
-  -- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
+-- | This is useful to provide a straight-forward `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _`.
+class JsonCodec (record :: # Type) (required :: # Type) (optional :: # Type) where
+  -- | Creates a `JsonCodec` for an `Option.Record _ _` given a `Record _` of `JsonCodec`s.
   -- |
   -- | E.g.
   -- | The `String` is used in errors when decoding fails.
   -- |
   -- | ```PureScript
   -- | type Example
-  -- |   = Option.Option
+  -- |   = Option.Record
   -- |       ( foo :: Boolean
-  -- |       , bar :: Int
+  -- |       )
+  -- |       ( bar :: Int
   -- |       )
   -- |
   -- | jsonCodec :: Data.Codec.Argonaut.JsonCodec Example
   -- | jsonCodec =
-  -- |   Option.jsonCodec
+  -- |   Option.jsonCodec'
   -- |     "Example"
   -- |     { foo: Data.Codec.Argonaut.boolean
   -- |     , bar: Data.Codec.Argonaut.int
@@ -1264,32 +1267,86 @@ class JsonCodec (record :: # Type) (option :: # Type) where
   jsonCodec' ::
     String ->
     Prim.Record record ->
-    Data.Codec.Argonaut.JsonCodec (Option option)
+    Data.Codec.Argonaut.JsonCodec (Record required optional)
 
--- | This instance ignores keys that do not exist in the given JSON object and does not insert keys that do not exist in the given `Option _`.
+-- | For required fields:
 -- |
--- | If a key does not exist in the JSON object, it will not be added to the `Option _`.
+-- | If a key does not exist in the JSON object, it will fail with an error.
 -- |
 -- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
 -- |
--- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option _`.
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
 -- |
--- | If a key does not exist in the given `Option _`, it is not added to the JSON object.
+-- | Every key in the given `Option.Record _ _` is encoded like normal and added it to the JSON object.
 -- |
--- | If a key does exists in the given `Option _`, it encodes it like normal and adds it to the JSON object.
-instance jsonCodecOptionAny ::
-  ( JsonCodecOption list record option
-  , Prim.RowList.RowToList record list
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given JSON object and does not insert keys that do not exist in the given `Option.Record _ _`.
+-- |
+-- | If a key does not exist in the JSON object, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the JSON object.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it encodes it like normal and adds it to the JSON object.
+instance jsonCodecRecordRequiredOptional ::
+  ( JsonCodecOption optionalList record optional
+  , JsonCodecRequired requiredList record required
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
   ) =>
-  JsonCodec record option where
+  JsonCodec record required optional where
   jsonCodec' ::
     String ->
     Prim.Record record ->
-    Data.Codec.Argonaut.JsonCodec (Option option)
-  jsonCodec' name record =
-    Data.Codec.Argonaut.object
-      name
-      (jsonCodecOption (Proxy :: Proxy list) record)
+    Data.Codec.Argonaut.JsonCodec (Record required optional)
+  jsonCodec' name record' = Data.Codec.Argonaut.object name codec
+    where
+    codec :: Data.Codec.Argonaut.JPropCodec (Record required optional)
+    codec =
+      Data.Codec.GCodec
+        (Control.Monad.Reader.Trans.ReaderT decode)
+        (Data.Profunctor.Star.Star encode)
+
+    decode ::
+      Foreign.Object.Object Data.Argonaut.Core.Json ->
+      Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record required optional)
+    decode object = case Data.Codec.decode requiredCodec object of
+      Data.Either.Left error -> Data.Either.Left error
+      Data.Either.Right required' -> case Data.Codec.decode optionalCodec object of
+        Data.Either.Left error -> Data.Either.Left error
+        Data.Either.Right optional' ->
+          Data.Either.Right
+            ( recordFromRecordAndOption
+                { optional: optional'
+                , required: required'
+                }
+            )
+
+    encode ::
+      Record required optional ->
+      Control.Monad.Writer.Writer
+        (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json))
+        (Record required optional)
+    encode record = do
+      Control.Monad.Writer.Class.tell (Data.Codec.encode requiredCodec (required record))
+      Control.Monad.Writer.Class.tell (Data.Codec.encode optionalCodec (optional record))
+      pure record
+
+    optionalCodec :: Data.Codec.Argonaut.JPropCodec (Option optional)
+    optionalCodec = jsonCodecOption optionalProxy record'
+
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
+
+    requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+    requiredCodec = jsonCodecRequired requiredProxy record'
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
 
 -- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
 class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
@@ -1316,10 +1373,9 @@ instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option wh
 else instance jsonCodecOptionCons ::
   ( Data.Symbol.IsSymbol label
   , JsonCodecOption list record option'
-  , Prim.Row.Cons label value' option' option
-  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value') record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value) record' record
   , Prim.Row.Lacks label option'
-  , Type.Equality.TypeEquals value (Data.Codec.Argonaut.JsonCodec value')
   ) =>
   JsonCodecOption (Prim.RowList.Cons label value list) record option where
   jsonCodecOption ::
@@ -1332,7 +1388,7 @@ else instance jsonCodecOptionCons ::
       (Control.Monad.Reader.Trans.ReaderT decode)
       (Data.Profunctor.Star.Star encode)
     where
-    codec :: Data.Codec.Argonaut.JsonCodec value'
+    codec :: Data.Codec.Argonaut.JsonCodec value
     codec = Record.get label record
 
     decode ::
@@ -1370,6 +1426,85 @@ else instance jsonCodecOptionCons ::
 
     option' :: Data.Codec.Argonaut.JPropCodec (Option option')
     option' = jsonCodecOption proxy record
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+-- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
+class JsonCodecRequired (list :: Prim.RowList.RowList) (record :: # Type) (required :: # Type) | list -> record required where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  jsonCodecRequired ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+
+instance jsonCodecRequiredNil :: JsonCodecRequired Prim.RowList.Nil record () where
+  jsonCodecRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record ())
+  jsonCodecRequired _ _ =
+    Data.Codec.mapCodec
+      (\_ -> Data.Either.Right {})
+      (\_ -> {})
+      Data.Codec.Argonaut.record
+else instance jsonCodecRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , JsonCodecRequired list record required'
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value) record' record
+  , Prim.Row.Lacks label required'
+  ) =>
+  JsonCodecRequired (Prim.RowList.Cons label value list) record required where
+  jsonCodecRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+  jsonCodecRequired _ record =
+    Data.Codec.GCodec
+      (Control.Monad.Reader.Trans.ReaderT decode)
+      (Data.Profunctor.Star.Star encode)
+    where
+    codec :: Data.Codec.Argonaut.JsonCodec value
+    codec = Record.get label record
+
+    decode ::
+      Foreign.Object.Object Data.Argonaut.Core.Json ->
+      Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Prim.Record required)
+    decode object' = do
+      required' <- Data.Codec.Argonaut.decode requiredCodec object'
+      case Foreign.Object.lookup key object' of
+        Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
+          Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
+          Data.Either.Right value -> Data.Either.Right (Record.insert label value required')
+        Data.Maybe.Nothing -> Data.Either.Left (Data.Codec.Argonaut.AtKey key Data.Codec.Argonaut.MissingValue)
+
+    encode ::
+      Prim.Record required ->
+      Control.Monad.Writer.Writer (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)) (Prim.Record required)
+    encode required' = do
+      Control.Monad.Writer.Class.tell
+        ( Data.List.Cons
+            (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codec (Record.get label required')))
+            Data.List.Nil
+        )
+      Control.Monad.Writer.Class.tell
+        (Data.Codec.Argonaut.encode requiredCodec (Record.delete label required'))
+      pure required'
+
+    key :: String
+    key = Data.Symbol.reflectSymbol label
+
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required')
+    requiredCodec = jsonCodecRequired proxy record
 
     proxy :: Proxy list
     proxy = Proxy
@@ -2333,7 +2468,7 @@ insert' ::
   Option option
 insert' = insert''
 
--- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
+-- | Creates a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Option _` given a `Record _` of `Data.Codec.Argonaut.JsonCodec _`s.
 -- |
 -- | The `String` is used in errors when decoding fails.
 -- |
@@ -2353,15 +2488,65 @@ insert' = insert''
 -- |     , bar: Data.Codec.Argonaut.int
 -- |     }
 -- | ```
--- |
--- | This is an alias for `jsonCodec'` so the documentation is a bit clearer.
 jsonCodec ::
-  forall option record.
-  JsonCodec record option =>
+  forall optional record.
+  JsonCodec record () optional =>
   String ->
   Prim.Record record ->
-  Data.Codec.Argonaut.JsonCodec (Option option)
-jsonCodec = jsonCodec'
+  Data.Codec.Argonaut.JsonCodec (Option optional)
+jsonCodec name record' = Data.Codec.basicCodec decode encode
+  where
+  codec :: Data.Codec.Argonaut.JsonCodec (Record () optional)
+  codec = jsonCodec' name record'
+
+  decode ::
+    Data.Argonaut.Core.Json ->
+    Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option optional)
+  decode json = case Data.Codec.decode codec json of
+    Data.Either.Left error -> Data.Either.Left error
+    Data.Either.Right record -> Data.Either.Right (optional record)
+
+  encode ::
+    Option optional ->
+    Data.Argonaut.Core.Json
+  encode option =
+    Data.Codec.encode codec
+      ( recordFromRecordAndOption
+          { optional: option
+          , required: {}
+          }
+      )
+
+-- | Creates a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _` given a `Record _` of `Data.Codec.Argonaut.JsonCodec _`s.
+-- |
+-- | The `String` is used in errors when decoding fails.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | type Example
+-- |   = Option.Record
+-- |       ( foo :: Boolean
+-- |       )
+-- |       ( bar :: Int
+-- |       )
+-- |
+-- | jsonCodec :: Data.Codec.Argonaut.JsonCodec Example
+-- | jsonCodec =
+-- |   Option.jsonCodecRecord
+-- |     "Example"
+-- |     { foo: Data.Codec.Argonaut.boolean
+-- |     , bar: Data.Codec.Argonaut.int
+-- |     }
+-- | ```
+-- |
+-- | This is an alias for `jsonCodec'` so the documentation is a bit clearer.
+jsonCodecRecord ::
+  forall optional record required.
+  JsonCodec record required optional =>
+  String ->
+  Prim.Record record ->
+  Data.Codec.Argonaut.JsonCodec (Record required optional)
+jsonCodecRecord name record' = jsonCodec' name record'
 
 -- | Manipulates the value of a key in an option.
 -- |
