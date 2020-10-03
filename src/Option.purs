@@ -265,6 +265,18 @@ newtype Record (required :: # Type) (optional :: # Type)
   , optional :: Option optional
   }
 
+derive newtype instance eqRecordRequiredOptional ::
+  ( Eq (Option optional)
+  , Eq (Prim.Record required)
+  ) =>
+  Eq (Record required optional)
+
+derive newtype instance ordRecordRequiredOptional ::
+  ( Ord (Option optional)
+  , Ord (Prim.Record required)
+  ) =>
+  Ord (Record required optional)
+
 instance showRecord ::
   ( Data.Show.ShowRecordFields requiredList required
   , Prim.RowList.RowToList optional optionalList

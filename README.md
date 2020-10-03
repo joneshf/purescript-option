@@ -7,6 +7,8 @@ A data type for optional values.
 * [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
 * [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
 * [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
+* [How To: Make a function with required and optional values](#how-to-make-a-function-with-required-and-optional-values)
+* [How To: Make a function with required and optional values from a record](#how-to-make-a-function-with-required-and-optional-values-from-a-record)
 * [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
@@ -160,6 +162,118 @@ Instead of needing to construct an `Option _` and pass it in, we give the `Recor
 > greeting { title: "wonderful" }
 "Hello, wonderful World"
 
+> greeting { name: "Pat" }
+"Hello, Pat"
+
+> greeting { name: "Pat", title: "Dr." }
+"Hello, Dr. Pat"
+```
+
+We've allowed people to override the behavior of the function with optional values using a record!
+
+## How To: Make a function with required and optional values
+
+Let's say we want to make a `greeting` function where people can pass in an `Option.Record ( name :: String ) ( title :: String )`.
+The `"name"` is required, but a `"title"` can be given to override the default behavior.
+I.e. we want something like: `greeting :: Option.Record ( name :: String ) ( title :: String ) -> String`.
+The implementation should be fairly straight forward:
+
+```PureScript
+import Prelude
+import Data.Maybe as Data.Maybe
+import Option as Option
+
+greeting ::
+  Option.Record ( name :: String ) ( title :: String ) ->
+  String
+greeting record' = "Hello, " <> title' <> record.name
+  where
+  record :: Record ( name :: String, title :: Data.Maybe.Maybe String )
+  record = Option.recordToRecord record'
+
+  title' :: String
+  title' = case record.title of
+    Data.Maybe.Just title -> title <> " "
+    Data.Maybe.Nothing -> ""
+```
+
+We look up the `"title"` in the given `Option.Record _ _`, and decide what to do with it.
+In the case of the `"title"`, we append a space so the output is still legible.
+With the `greeting` function, we can pass in an option and alter the behavior:
+
+```PureScript
+> greeting (Option.recordFromRecord { name: "Pat" })
+"Hello, Pat"
+
+> greeting (Option.recordFromRecord { name: "Pat", title: "Dr." })
+"Hello, Dr. Pat"
+```
+
+We've allowed people to override the behavior of the function with optional values!
+
+It might be instructive to compare how we might write a similar function using a `Record _` instead of `Option _`:
+```PureScript
+greeting' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  String
+greeting' record = "Hello, " <> title' <> record.name
+  where
+  title' :: String
+  title' = case record.title of
+    Data.Maybe.Just title -> title <> " "
+    Data.Maybe.Nothing -> ""
+```
+
+To implement `greeting'`, nothing really changed.
+We don't have to convert down to a language-level Record because the argument is already a language-level Record.
+That's the only difference as far as implementing `greeting'`.
+
+To use `greeting'`, we force the users of `greeting'` to do always give us a value in the record:
+```PureScript
+> User.greeting' { name: "Pat", title: Data.Maybe.Nothing }
+"Hello, Pat"
+
+> User.greeting' { name: "Pat", title: Data.Maybe.Just "Dr." }
+"Hello, Dr. Pat"
+```
+
+## How To: Make a function with required and optional values from a record
+
+Let's say we want to solve a similar problem as before, but we don't want to force people to create the `Option.Record _ _` themselves.
+We want to allow people to pass in a record that may be missing some fields.
+To write this version of `greeting`, we'll need to use the `FromRecord` typeclass (see the section on `FromRecord` for more information).
+I.e. we want something like: `greeting :: forall record. Option.FromRecord record ( name :: String ) ( title :: String ) => Record record -> String`.
+
+The implementation moves the work of constructing the `Option.Record _ _`, but should also be straight forward:
+
+```PureScript
+import Prelude
+import Data.Maybe as Data.Maybe
+import Option as Option
+
+greeting ::
+  forall record.
+  Option.FromRecord record ( name :: String ) ( title :: String ) =>
+  Record record ->
+  String
+greeting record'' = "Hello, " <> title' <> record.name
+  where
+  record :: Record ( name :: String, title :: Data.Maybe.Maybe String )
+  record = Option.recordToRecord record'
+
+  record' :: Option.Record ( name :: String ) ( title :: String )
+  record' = Option.recordFromRecord record''
+
+  title' :: String
+  title' = case record.title of
+    Data.Maybe.Just title -> title <> " "
+    Data.Maybe.Nothing -> ""
+```
+
+We can use this similar to how we used the previous implementation of `greeting`.
+Instead of needing to construct an `Option.Record _ _` and pass it in, we give the `Record _` directly:
+
+```PureScript
 > greeting { name: "Pat" }
 "Hello, Pat"
 

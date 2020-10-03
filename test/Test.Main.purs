@@ -8,6 +8,8 @@ import HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptCodecArgonaut as H
 import HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON as HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON
 import HowTo.MakeAFunctionWithOptionalValues as HowTo.MakeAFunctionWithOptionalValues
 import HowTo.MakeAFunctionWithOptionalValuesFromARecord as HowTo.MakeAFunctionWithOptionalValuesFromARecord
+import HowTo.MakeAFunctionWithRequiredAndOptionalValues as HowTo.MakeAFunctionWithRequiredAndOptionalValues
+import HowTo.MakeAFunctionWithRequiredAndOptionalValuesFromARecord as HowTo.MakeAFunctionWithRequiredAndOptionalValuesFromARecord
 import HowTo.ProvideAnEasierAPIForDateTime as HowTo.ProvideAnEasierAPIForDateTime
 import Test.Option as Test.Option
 import Test.Spec as Test.Spec
@@ -30,6 +32,8 @@ spec = do
   Test.Option.spec
   HowTo.MakeAFunctionWithOptionalValues.spec
   HowTo.MakeAFunctionWithOptionalValuesFromARecord.spec
+  HowTo.MakeAFunctionWithRequiredAndOptionalValues.spec
+  HowTo.MakeAFunctionWithRequiredAndOptionalValuesFromARecord.spec
   HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptArgonaut.spec
   HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptCodecArgonaut.spec
   HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON.spec
