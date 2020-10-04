@@ -355,6 +355,41 @@ instance encodeJsonRecordRequiredOptional ::
     requiredProxy :: Type.Data.RowList.RLProxy requiredList
     requiredProxy = Type.Data.RowList.RLProxy
 
+-- | For required fields:
+-- |
+-- | If a key does not exist in the `Foreign.Foreign`, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` but the value cannot be successfully read, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` and the value can be successfully read, it will be added to the `Option.Record _ _`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given `Foreign.Foreign`.
+-- |
+-- | If a key does not exist in the `Foreign.Foreign`, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` but the value cannot be successfully read, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` and the value can be successfully read, it will be added to the `Option.Record _ _`.
+instance readForeignRecordRequiredOptional ::
+  ( Simple.JSON.ReadForeign (Option optional)
+  , Simple.JSON.ReadForeign (Prim.Record required)
+  ) =>
+  Simple.JSON.ReadForeign (Record required optional) where
+  readImpl ::
+    Foreign.Foreign ->
+    Foreign.F (Record required optional)
+  readImpl foreign' = do
+    required' <- Simple.JSON.readImpl foreign'
+    optional' <- Simple.JSON.readImpl foreign'
+    pure
+      ( recordFromRecordAndOption
+          { optional: optional'
+          , required: required'
+          }
+      )
+
 instance showRecord ::
   ( Data.Show.ShowRecordFields requiredList required
   , Prim.RowList.RowToList optional optionalList
@@ -397,6 +432,44 @@ instance showRecord ::
 
     requiredProxy :: Type.Data.RowList.RLProxy requiredList
     requiredProxy = Type.Data.RowList.RLProxy
+
+-- | For required fields:
+-- |
+-- | Every key in the given `Option.Record _ _` is written like normal and added to the `Foreign.Foreign`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the `Foreign`.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it writes it like normal and adds it to the `Foreign.Foreign`.
+instance writeForeignRecordRequiredOptional ::
+  ( Simple.JSON.WriteForeign (Option optional)
+  , Simple.JSON.WriteForeign (Prim.Record required)
+  ) =>
+  Simple.JSON.WriteForeign (Record required optional) where
+  writeImpl ::
+    Record required optional ->
+    Foreign.Foreign
+  writeImpl record =
+    Foreign.unsafeToForeign
+      ( Foreign.Object.union
+          requiredObject
+          optionalObject
+      )
+    where
+    optionalForeign :: Foreign.Foreign
+    optionalForeign = Simple.JSON.writeImpl (optional record)
+
+    optionalObject :: Foreign.Object.Object Foreign.Foreign
+    optionalObject = Foreign.unsafeFromForeign optionalForeign
+
+    requiredForeign :: Foreign.Foreign
+    requiredForeign = Simple.JSON.writeImpl (required record)
+
+    requiredObject :: Foreign.Object.Object Foreign.Foreign
+    requiredObject = Foreign.unsafeFromForeign requiredForeign
 
 -- | A typeclass that manipulates the values in an `Option _`.
 -- |

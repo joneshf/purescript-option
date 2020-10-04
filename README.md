@@ -14,6 +14,7 @@ A data type for optional values.
 * [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
 * [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
 * [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
+* [How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-simple-json)
 * [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
 * [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
@@ -1362,6 +1363,121 @@ If we try decoding and encoding now, we get something closer to what we wanted:
 
 > Data.Argonaut.Core.stringify (encode''' { name: "Pat", title: Data.Maybe.Just "Dr." })
 "{\"name\":\"Pat\",\"title\":\"Dr.\"}"
+```
+
+## How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`
+
+Another common pattern with JSON objects is that some keys always have to be present while others do not.
+Some APIs make the distinction between a JSON object like `{ "name": "Pat" }` and one like `{ "name": "Pat", "title": null }`.
+In the first case, it might recognize that the `"title"` key does not exist, and behave in a different way from the `"title"` key having a value of `null`.
+In the second case, it might notice that the `"title"` key exists and work with the value assuming it's good to go; the `null` might eventually cause a failure later.
+
+In many cases, what we want is to not generate any fields that do not exist.
+Using `purescript-simple-json`, `Option.Record _ _` can help with that idea:
+
+```PureScript
+import Prelude
+import Data.Either as Data.Either
+import Data.Semigroup.Foldable as Data.Semigroup.Foldable
+import Foreign as Foreign
+import Option as Option
+import Simple.JSON as Simple.JSON
+
+parse ::
+  String ->
+  Data.Either.Either String (Option.Record ( name :: String ) ( title :: String ))
+parse string = case readJSON string of
+  Data.Either.Left errors -> Data.Either.Left (Data.Semigroup.Foldable.intercalateMap " " Foreign.renderForeignError errors)
+  Data.Either.Right record -> Data.Either.Right record
+
+readJSON ::
+  String ->
+  Simple.JSON.E (Option.Record ( name :: String ) ( title :: String ))
+readJSON = Simple.JSON.readJSON
+
+writeJSON ::
+  Option.Record ( name :: String ) ( title :: String ) ->
+  String
+writeJSON = Simple.JSON.writeJSON
+```
+
+We can give that a spin with some different JSON values:
+```PureScript
+> parse """{}"""
+(Left "Error at property \"name\": Type mismatch: expected String, found Undefined")
+
+> parse """{"title": "wonderful"}"""
+(Left "Error at property \"name\": Type mismatch: expected String, found Undefined")
+
+> parse """{"name": "Pat"}"""
+(Right (Option.recordFromRecord { name: "Pat" }))
+
+> parse """{"name": "Pat", "title": "Dr."}"""
+(Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+```
+
+We can also produce some different JSON values:
+
+```PureScript
+> writeJSON (Option.recordFromRecord {name: "Pat"})
+"{\"name\":\"Pat\"}"
+
+> writeJSON (Option.recordFromRecord {name: "Pat", title: "Dr."})
+"{\"title\":\"Dr.\",\"name\":\"Pat\"}"
+```
+
+Notice that we don't end up with a `"title"` field in the JSON output unless we have a `title` field in our record.
+
+It might be instructive to compare how we might write a similar functions using a `Record _` instead of `Option.Record _ _`:
+With `purescript-simple-json`, the instances for decoding and encoding on records handle `Data.Maybe.Maybe _` values like they are optional.
+If we attempt to go directly to `Record ( name :: String, title :: Data.Maybe.Maybe String )`:
+
+```PureScript
+import Prelude
+import Data.Either as Data.Either
+import Data.Maybe as Data.Maybe
+import Data.Semigroup.Foldable as Data.Semigroup.Foldable
+import Foreign as Foreign
+import Simple.JSON as Simple.JSON
+
+parse' ::
+  String ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+parse' string = case readJSON string of
+  Data.Either.Left errors -> Data.Either.Left (Data.Semigroup.Foldable.intercalateMap " " Foreign.renderForeignError errors)
+  Data.Either.Right record -> Data.Either.Right record
+
+readJSON' ::
+  String ->
+  Simple.JSON.E (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+readJSON' = Simple.JSON.readJSON
+
+writeJSON' ::
+  Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
+  String
+writeJSON' = Simple.JSON.writeJSON
+```
+
+We get the behavior we expect:
+
+```PureScript
+> parse' """{}"""
+(Left "Error at property \"name\": Type mismatch: expected String, found Undefined")
+
+> parse' """{"title": "wonderful"}"""
+(Left "Error at property \"name\": Type mismatch: expected String, found Undefined")
+
+> parse' """{"name": "Pat"}"""
+(Right { name: "Pat", title: Nothing })
+
+> parse' """{"name": "Pat", "title": "Dr."}"""
+(Right { name: "Pat", title: (Just "Dr.") })
+
+> writeJSON' {name: "Pat", title: Data.Maybe.Nothing}
+"{\"name\":\"Pat\"}"
+
+> writeJSON' {name: "Pat", title: Data.Maybe.Just "Dr."}
+"{\"title\":\"Dr.\",\"name\":\"Pat\"}"
 ```
 
 ## How To: Provide an easier API for `DateTime`
