@@ -36,7 +36,7 @@ $(foreach test, $(TESTS), $(eval $(call TEST_OUTPUT_RULE, $(test))))
 $(OUTPUT):
 	mkdir -p $@
 
-$(OUTPUT)/test.js: $(OUTPUT)/Test.Main/index.js | $(OUTPUT)
+$(OUTPUT)/test.js: $(SRC_OUTPUTS) $(TEST_OUTPUTS) | $(OUTPUT)
 	$(PURS) bundle \
 	  --main Test.Main \
 	  --module Test.Main \
