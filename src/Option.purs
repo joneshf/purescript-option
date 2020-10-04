@@ -45,6 +45,7 @@ module Option
   , modify'
   , optional
   , recordFromRecord
+  , recordSet
   , recordToRecord
   , required
   , set
@@ -94,12 +95,15 @@ module Option
   , modifyOption
   , class OrdOption
   , compareOption
+  , class Partition
   , class ReadForeignOption
   , readImplOption
   , class Set
   , set''
   , class SetOption
   , setOption
+  , class SetRequired
+  , setRequired
   , class ShowOption
   , showOption
   , class ToRecord
@@ -1729,6 +1733,25 @@ else instance ordOptionCons ::
     rightValue :: Data.Maybe.Maybe value
     rightValue = get label right
 
+-- | A typeclass that iterates a `RowList` partitioning required rows from the optional rows.
+-- |
+-- | This is like the built in row-polymorphism,
+-- | except it only cares about the labels of the row.
+-- | The type can vary between the iterated `RowList` and the required/optional rows.
+-- | If it differs,
+-- | the type from the iterated `RowList` is used.
+class Partition (list :: Prim.RowList.RowList) (requiredInput :: Prim.RowList.RowList) (optionalInput :: Prim.RowList.RowList) (requiredOutput :: Prim.RowList.RowList) (optionalOutput :: Prim.RowList.RowList) | list optionalInput requiredInput -> optionalOutput requiredOutput
+
+instance partitionNilNilNil :: Partition Prim.RowList.Nil requiredInput optionalInput Prim.RowList.Nil Prim.RowList.Nil
+else instance partitionConsConsAny ::
+  ( Partition list requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label requiredValue list) (Prim.RowList.Cons label value requiredInput) optionalInput (Prim.RowList.Cons label requiredValue requiredOutput) optionalOutput
+else instance partitionConsAnyCons ::
+  ( Partition list requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label optionalValue list) requiredInput (Prim.RowList.Cons label value optionalInput) requiredOutput (Prim.RowList.Cons label optionalValue optionalOutput)
+
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
 class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
@@ -1783,37 +1806,51 @@ else instance readForeignOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
--- | A typeclass that sets values in an `Option _`.
+-- | A typeclass that sets values in an `Option.Record _ _`.
 -- |
--- | The keys must already exist in the option.
--- | If any keys might not already exist in the option,
+-- | The keys must already exist in the `Option.Record _ _`.
+-- | If any keys might not already exist in the `Option.Record _ _`,
 -- | `insert''` should be used instead.
 -- |
 -- | E.g.
 -- | ```PureScript
--- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | someOption = Option.empty
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someRecord = Option.fromRecord' { foo: true }
 -- |
--- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.set'' { bar: 31 } someOption
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | anotherRecord = Option.set'' { bar: 31 } someRecord
 -- | ```
-class Set (record :: # Type) (option' :: # Type) (option :: # Type) where
+class Set (record :: # Type) (requiredInput :: # Type) (optionalInput :: # Type) (requiredOutput :: # Type) (optionalOutput :: # Type) where
   set'' ::
     Prim.Record record ->
-    Option option' ->
-    Option option
+    Record requiredInput optionalInput ->
+    Record requiredOutput optionalOutput
 
--- | This instance sets all values in an `Option _`.
+-- | This instance sets all values in an `Option.Record _ _`.
 instance setAny ::
-  ( Prim.RowList.RowToList record list
-  , SetOption list record option' option
+  ( Partition recordList requiredList' optionalList' requiredList optionalList
+  , Prim.RowList.RowToList optional' optionalList'
+  , Prim.RowList.RowToList record recordList
+  , Prim.RowList.RowToList required' requiredList'
+  , SetOption optionalList record optional' optional
+  , SetRequired requiredList record required' required
   ) =>
-  Set record option' option where
+  Set record required' optional' required optional where
   set'' ::
     Prim.Record record ->
-    Option option' ->
-    Option option
-  set'' = setOption (Proxy :: Proxy list)
+    Record required' optional' ->
+    Record required optional
+  set'' record' record =
+    recordFromRecordAndOption
+      { optional: setOption optionalList record' (optional record)
+      , required: setRequired requiredList record' (required record)
+      }
+    where
+    optionalList :: Proxy optionalList
+    optionalList = Proxy
+
+    requiredList :: Proxy requiredList
+    requiredList = Proxy
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
 class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, option' record -> option where
@@ -1895,6 +1932,57 @@ else instance setOptionCons ::
 
     option :: Option option'
     option = setOption proxy record oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    value :: value
+    value = Record.get label record
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` setting values in a `Record _`.
+class SetRequired (list :: Prim.RowList.RowList) (record :: # Type) (required' :: # Type) (required :: # Type) | list required' -> required, required' record -> required where
+  setRequired ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Prim.Record required' ->
+    Prim.Record required
+
+instance setRequiredNil ::
+  SetRequired Prim.RowList.Nil record required required where
+  setRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Prim.Record required ->
+    Prim.Record required
+  setRequired _ _ record = record
+else instance setRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Cons label value' oldRequired' oldRequired
+  , Prim.Row.Lacks label oldRequired'
+  , Prim.Row.Lacks label required'
+  , SetRequired list record oldRequired' required'
+  ) =>
+  SetRequired (Prim.RowList.Cons label value list) record oldRequired required where
+  setRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Prim.Record record ->
+    Prim.Record oldRequired ->
+    Prim.Record required
+  setRequired _ record oldRequired = Record.insert label value newRequired
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldRequired' :: Prim.Record oldRequired'
+    oldRequired' = Record.delete label oldRequired
+
+    newRequired :: Prim.Record required'
+    newRequired = setRequired proxy record oldRequired'
 
     proxy :: Proxy list
     proxy = Proxy
@@ -2745,6 +2833,27 @@ recordFromRecordAndOption record =
     , required: record.required
     }
 
+-- | Sets the given key/values in an `Option.Record _ _`.
+-- | The key must already exist in the `Option.Record _ _`.
+-- | If the key might not already exist in the `Option.Record _ _`, `recordInsert` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someRecord = Option.recordFromRecord { foo: true }
+-- |
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | anotherRecord = Option.recordSet { bar: 31 } someRecord
+-- | ```
+-- | This is an alias for `set''` so the documentation is a bit clearer.
+recordSet ::
+  forall optional optional' record required required'.
+  Set record required' optional' required optional =>
+  Prim.Record record ->
+  Record required' optional' ->
+  Record required optional
+recordSet record' record = set'' record' record
+
 -- | The expected `Record record` will have the same fields as the given `Option.Record required optional` where each optional type is wrapped in a `Maybe`.
 -- |
 -- | E.g.
@@ -2824,12 +2933,22 @@ set proxy value option = (alter' go proxy option).option
 -- | anotherOption = Option.set' { bar: 31 } someOption
 -- | ```
 set' ::
-  forall option option' record.
-  Set record option' option =>
+  forall optional optional' record.
+  Set record () optional' () optional =>
   Prim.Record record ->
-  Option option' ->
-  Option option
-set' = set''
+  Option optional' ->
+  Option optional
+set' record'' option = optional record
+  where
+  record' :: Record () optional'
+  record' =
+    recordFromRecordAndOption
+      { optional: option
+      , required: {}
+      }
+
+  record :: Record () optional
+  record = set'' record'' record'
 
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
@@ -2946,3 +3065,18 @@ greeting1 = recordFromRecord { name: "Pat" }
 
 greeting2 :: Greeting
 greeting2 = recordFromRecord { name: "Pat", title: "Dr." }
+
+greeting3 :: Greeting
+greeting3 = recordSet { name: "Chris" } greeting1
+
+greeting4 :: Greeting
+greeting4 = recordSet { title: "Dr." } greeting1
+
+greeting5 :: Greeting
+greeting5 = recordSet { name: "Chris", title: "Dr." } greeting1
+
+greeting6 :: Greeting
+greeting6 = recordSet { name: "Chris", title: Data.Maybe.Just "Dr." } greeting1
+
+greeting7 :: Greeting
+greeting7 = recordSet { name: "Chris", title: Data.Maybe.Nothing } greeting1

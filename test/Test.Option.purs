@@ -19,6 +19,7 @@ spec =
     spec_modify'
     spec_recordFromRecord
     spec_recordToRecord
+    spec_recordSet
     spec_set
     spec_set'
 
@@ -113,6 +114,58 @@ spec_recordFromRecord =
             }
       Option.required record `Test.Spec.Assertions.shouldEqual` { name: "Pat" }
       Option.optional record `Test.Spec.Assertions.shouldEqual` Option.empty
+
+spec_recordSet :: Test.Spec.Spec Unit
+spec_recordSet =
+  Test.Spec.describe "recordSet" do
+    Test.Spec.it "sets a value when it doesn't exist" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord = Option.recordFromRecord { foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: 31 } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "can change the type" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Boolean )
+        someRecord = Option.recordFromRecord { foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: 31 } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "can use a `Data.Maybe.Maybe _`" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord = Option.recordFromRecord { foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: Data.Maybe.Just 31 } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "`Data.Maybe.Nothing` keeps the previous value" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord = Option.recordFromRecord { bar: 31, foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: Data.Maybe.Nothing } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "can set both required and optional values" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord = Option.recordFromRecord { foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: 31 } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "can change the type of both required and optional values" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Boolean )
+        someRecord = Option.recordFromRecord { foo: false }
+
+        anotherRecord :: Option.Record ( foo :: Int ) ( bar :: Int )
+        anotherRecord = Option.recordSet { bar: 31, foo: 43 } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: 43 }
 
 spec_recordToRecord :: Test.Spec.Spec Unit
 spec_recordToRecord =
