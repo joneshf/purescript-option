@@ -895,6 +895,34 @@ instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option 
     Prim.Record record ->
     Option option
   fromRecordOption _ _ = empty
+else instance fromRecordOptionConsMaybe ::
+  ( Data.Symbol.IsSymbol label
+  , FromRecordOption list record option'
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label (Data.Maybe.Maybe value) record' record
+  , Prim.Row.Lacks label option'
+  ) =>
+  FromRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) record option where
+  fromRecordOption ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    Prim.Record record ->
+    Option option
+  fromRecordOption _ record = case value' of
+    Data.Maybe.Just value -> insert label value option
+    Data.Maybe.Nothing -> insertField label option
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    option :: Option option'
+    option = fromRecordOption proxy record
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    value' :: Data.Maybe.Maybe value
+    value' = Record.get label record
 else instance fromRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
   , FromRecordOption list record option'
@@ -3056,6 +3084,18 @@ user21 = modify' { age: \_ -> true } user
 
 user22 :: Option ( age :: Boolean, username :: String )
 user22 = alter { age: \(_ :: Data.Maybe.Maybe Int) -> Data.Maybe.Just true } user
+
+user23 :: User
+user23 = fromRecord { age: Data.Maybe.Just 31, username: Data.Maybe.Just "Pat" }
+
+user24 :: User
+user24 = fromRecord { age: Data.Maybe.Just 31, username: Data.Maybe.Nothing }
+
+user25 :: User
+user25 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Just "Pat" }
+
+user26 :: User
+user26 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Nothing }
 
 type Greeting
   = Record ( name :: String ) ( title :: String )
