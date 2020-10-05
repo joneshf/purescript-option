@@ -16,7 +16,7 @@
     "url": "https://github.com/joneshf/purescript-option.git"
   },
   "dependencies": {
-    "purescript-argonaut-codecs": ">= 3.0.1 < 7.0.0",
+    "purescript-argonaut-codecs": ">= 7.0.0 < 8.0.0",
     "purescript-argonaut-core": ">= 4.0.0 < 6.0.0",
     "purescript-codec": ">= 2.0.0 < 4.0.0",
     "purescript-codec-argonaut": ">= 2.0.0 < 8.0.0",
