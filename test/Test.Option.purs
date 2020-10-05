@@ -15,6 +15,7 @@ spec :: Test.Spec.Spec Unit
 spec =
   Test.Spec.describe "Test.Option" do
     spec_alter
+    spec_fromRecord
     spec_fromRecordWithRequired
     spec_get'
     spec_modify'
@@ -53,6 +54,74 @@ spec_alter =
           Data.Maybe.Maybe String
         qux _ = Data.Maybe.Nothing
       Option.alter { bar, qux } someOption `Test.Spec.Assertions.shouldEqual` Option.fromRecord { bar: "positive" }
+
+spec_fromRecord :: Test.Spec.Spec Unit
+spec_fromRecord =
+  Test.Spec.describe "fromRecord" do
+    Test.Spec.it "only sets the given values" do
+      let
+        option ::
+          Option.Option
+            ( age :: Int
+            , name :: String
+            )
+        option =
+          Option.fromRecord
+            { name: "Pat"
+            }
+      Option.toRecord option `Test.Spec.Assertions.shouldEqual` { age: Data.Maybe.Nothing, name: Data.Maybe.Just "Pat" }
+    Test.Spec.it "allows `Data.Maybe.Just _`" do
+      let
+        option ::
+          Option.Option
+            ( age :: Int
+            , name :: String
+            )
+        option =
+          Option.fromRecord
+            { name: Data.Maybe.Just "Pat"
+            }
+      Option.toRecord option `Test.Spec.Assertions.shouldEqual` { age: Data.Maybe.Nothing, name: Data.Maybe.Just "Pat" }
+    Test.Spec.it "allows `Data.Maybe.Nothing`" do
+      let
+        option ::
+          Option.Option
+            ( age :: Int
+            , name :: String
+            )
+        option =
+          Option.fromRecord
+            { name: Data.Maybe.Nothing
+            }
+      Option.toRecord option `Test.Spec.Assertions.shouldEqual` { age: Data.Maybe.Nothing, name: Data.Maybe.Nothing }
+    Test.Spec.it "allows `Data.Maybe.Just _` and `Data.Maybe.Nothing`" do
+      let
+        option ::
+          Option.Option
+            ( age :: Int
+            , name :: String
+            )
+        option =
+          Option.fromRecord
+            { age: Data.Maybe.Just 31
+            , name: Data.Maybe.Nothing
+            }
+      Option.toRecord option `Test.Spec.Assertions.shouldEqual` { age: Data.Maybe.Just 31, name: Data.Maybe.Nothing }
+    Test.Spec.it "allows nested `Data.Maybe.Maybe _`s" do
+      let
+        option ::
+          Option.Option
+            ( active :: Data.Maybe.Maybe Boolean
+            , age :: Data.Maybe.Maybe (Data.Maybe.Maybe Int)
+            , name :: String
+            )
+        option =
+          Option.fromRecord
+            { active: Data.Maybe.Just (Data.Maybe.Just true)
+            , age: Data.Maybe.Just (Data.Maybe.Just (Data.Maybe.Just 31))
+            , name: Data.Maybe.Just "Pat"
+            }
+      Option.toRecord option `Test.Spec.Assertions.shouldEqual` { active: Data.Maybe.Just (Data.Maybe.Just true), age: Data.Maybe.Just (Data.Maybe.Just (Data.Maybe.Just 31)), name: Data.Maybe.Just "Pat" }
 
 spec_fromRecordWithRequired :: Test.Spec.Spec Unit
 spec_fromRecordWithRequired =
