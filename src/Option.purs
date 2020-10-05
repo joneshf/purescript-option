@@ -122,6 +122,7 @@ import Control.Monad.Writer as Control.Monad.Writer
 import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
 import Data.Codec as Data.Codec
 import Data.Codec.Argonaut as Data.Codec.Argonaut
@@ -169,10 +170,10 @@ instance decodeJsonOptionOption ::
   Data.Argonaut.Decode.Class.DecodeJson (Option option) where
   decodeJson ::
     Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Option option)
-  decodeJson json = case Data.Argonaut.Core.toObject json of
-    Data.Maybe.Just object -> decodeJsonOption (Proxy :: Proxy list) object
-    Data.Maybe.Nothing -> Data.Either.Left "Expected JSON object"
+    Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option)
+  decodeJson json = case Data.Argonaut.Decode.Class.decodeJson json of
+    Data.Either.Left error -> Data.Either.Left error
+    Data.Either.Right object -> decodeJsonOption (Proxy :: Proxy list) object
 
 -- | This instance ignores keys that do not exist.
 -- |
@@ -306,7 +307,7 @@ instance decodeJsonRecordRequiredOptional ::
   Data.Argonaut.Decode.Class.DecodeJson (Record required optional) where
   decodeJson ::
     Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Record required optional)
+    Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Record required optional)
   decodeJson json = case Data.Argonaut.Decode.Class.decodeJson json of
     Data.Either.Left error -> Data.Either.Left error
     Data.Either.Right required' -> case Data.Argonaut.Decode.Class.decodeJson json of
@@ -574,14 +575,14 @@ class DecodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list 
     forall proxy.
     proxy list ->
     Foreign.Object.Object Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Option option)
+    Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option)
 
 instance decodeJsonOptionNil :: DecodeJsonOption Prim.RowList.Nil option where
   decodeJsonOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Foreign.Object.Object Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Option option)
+    Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option)
   decodeJsonOption _ _ = Data.Either.Right empty
 else instance decodeJsonOptionCons ::
   ( Data.Argonaut.Decode.Class.DecodeJson value
@@ -595,7 +596,7 @@ else instance decodeJsonOptionCons ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
     Foreign.Object.Object Data.Argonaut.Core.Json ->
-    Data.Either.Either String (Option option)
+    Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option)
   decodeJsonOption _ object' = case Foreign.Object.lookup key object' of
     Data.Maybe.Just json -> do
       value <- Data.Argonaut.Decode.Class.decodeJson json
@@ -611,7 +612,7 @@ else instance decodeJsonOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    option' :: Data.Either.Either String (Option option')
+    option' :: Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option')
     option' = decodeJsonOption proxy object'
 
     proxy :: Proxy list

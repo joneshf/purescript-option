@@ -306,20 +306,29 @@ encode ::
   Option.Option ( name :: String, title :: String ) ->
   Data.Argonaut.Core.Json
 encode = Data.Argonaut.Encode.Class.encodeJson
+
+parse ::
+  String ->
+  Data.Either.Either String (Option.Option (name :: String, title :: String))
+parse string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right option -> Data.Either.Right option
 ```
 
 We can give that a spin with some different JSON values:
 ```PureScript
-> decode =<< Data.Argonaut.Parser.jsonParser """{}"""
+> parse """{}"""
 (Right (Option.fromRecord {}))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
+> parse """{"title": "wonderful"}"""
 (Right (Option.fromRecord { title: "wonderful" }))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
+> parse """{"name": "Pat"}"""
 (Right (Option.fromRecord { name: "Pat" }))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.fromRecord { name: "Pat", title: "Dr." }))
 ```
 
@@ -355,21 +364,30 @@ encode' ::
   Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ) ->
   Data.Argonaut.Core.Json
 encode' = Data.Argonaut.Encode.Class.encodeJson
+
+parse' ::
+  String ->
+  Data.Either.Either String (Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ))
+parse' string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right record -> Data.Either.Right record
 ```
 
 We won't get the behavior we expect:
 
 ```PureScript
-> decode' =<< Data.Argonaut.Parser.jsonParser """{}"""
-(Left "JSON was missing expected field: title")
+> parse' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'title':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
-(Left "JSON was missing expected field: name")
+> parse' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
-(Left "JSON was missing expected field: title")
+> parse' """{"name": "Pat"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'title':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> parse' """{"name": "Pat", "title": "Dr."}"""
 (Right { name: (Just "Pat"), title: (Just "Dr.") })
 
 > Data.Argonaut.Core.stringify (encode' { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing })
@@ -418,21 +436,30 @@ instance encodeJsonGreeting :: Data.Argonaut.Encode.Class.EncodeJson Greeting wh
           (Data.Argonaut.Encode.Combinators.assocOptional "title" title)
           (Data.Argonaut.Core.jsonEmptyObject)
       )
+
+parse'' ::
+  String ->
+  Data.Either.Either String Greeting
+parse'' string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right greeting -> Data.Either.Right greeting
 ```
 
 If we try decoding and encoding now, we get something closer to what we wanted:
 
 ```PureScript
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{}""" :: Data.Either.Either String Greeting
+> parse'' """{}"""
 (Right (Greeting { name: Nothing, title: Nothing }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}""" :: Data.Either.Either String Greeting
+> parse'' """{"title": "wonderful"}"""
 (Right (Greeting { name: Nothing, title: (Just "wonderful") }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}""" :: Data.Either.Either String Greeting
+> parse'' """{"name": "Pat"}"""
 (Right (Greeting { name: (Just "Pat"), title: Nothing }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}""" :: Data.Either.Either String Greeting
+> parse'' """{"name": "Pat", "title": "Dr."}"""
 (Right (Greeting { name: (Just "Pat"), title: (Just "Dr.") }))
 
 > Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing }))
@@ -881,7 +908,9 @@ Using `purescript-argonaut`, `Option.Record _ _` can help with that idea:
 import Prelude
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
+import Data.Argonaut.Parser as Data.Argonaut.Parser
 import Data.Either as Data.Either
 import Option as Option
 
@@ -894,20 +923,29 @@ encode ::
   Option.Record ( name :: String ) ( title :: String ) ->
   Data.Argonaut.Core.Json
 encode = Data.Argonaut.Encode.Class.encodeJson
+
+parse ::
+  String ->
+  Data.Either.Either String (Option.Record ( name :: String ) ( title :: String ))
+parse string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right record -> Data.Either.Right record
 ```
 
 We can give that a spin with some different JSON values:
 ```PureScript
-> decode =<< Data.Argonaut.Parser.jsonParser """{}"""
-(Left "JSON was missing expected field: name")
+> parse """{}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
-(Left "JSON was missing expected field: name")
+> parse """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
+> parse """{"name": "Pat"}"""
 (Right (Option.recordFromRecord { name: "Pat" }))
 
-> decode =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
 ```
 
@@ -930,7 +968,9 @@ If we attempt to go directly to `Record ( name :: String, title :: Data.Maybe.Ma
 ```PureScript
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
+import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
+import Data.Argonaut.Parser as Data.Argonaut.Parser
 import Data.Either as Data.Either
 import Data.Maybe as Data.Maybe
 
@@ -943,21 +983,30 @@ encode' ::
   Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
   Data.Argonaut.Core.Json
 encode' = Data.Argonaut.Encode.Class.encodeJson
+
+parse' ::
+  String ->
+  Data.Either.Either String (Record ( name :: String, title :: Data.Maybe.Maybe String ))
+parse' string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right record -> Data.Either.Right record
 ```
 
 We won't get the behavior we expect:
 
 ```PureScript
-> decode' =<< Data.Argonaut.Parser.jsonParser """{}"""
-(Left "JSON was missing expected field: title")
+> parse' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'title':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}"""
-(Left "JSON was missing expected field: name")
+> parse' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}"""
-(Left "JSON was missing expected field: title")
+> parse' """{"name": "Pat"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'title':\n  No value was found.")
 
-> decode' =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}"""
+> parse' """{"name": "Pat", "title": "Dr."}"""
 (Right { name: "Pat", title: (Just "Dr.") })
 
 > Data.Argonaut.Core.stringify (encode' { name: "Pat", title: Data.Maybe.Nothing })
@@ -976,8 +1025,10 @@ import Prelude
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
 import Data.Argonaut.Decode.Combinators as Data.Argonaut.Decode.Combinators
+import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
 import Data.Argonaut.Encode.Combinators as Data.Argonaut.Encode.Combinators
+import Data.Argonaut.Parser as Data.Argonaut.Parser
 import Data.Either as Data.Either
 import Data.Generic.Rep as Data.Generic.Rep
 import Data.Generic.Rep.Show as Data.Generic.Rep.Show
@@ -1011,21 +1062,30 @@ instance encodeJsonGreeting :: Data.Argonaut.Encode.Class.EncodeJson Greeting wh
           (Data.Argonaut.Encode.Combinators.assocOptional "title" title)
           (Data.Argonaut.Core.jsonEmptyObject)
       )
+
+parse'' ::
+  String ->
+  Data.Either.Either String Greeting
+parse'' string = case Data.Argonaut.Parser.jsonParser string of
+  Data.Either.Left error -> Data.Either.Left error
+  Data.Either.Right json -> case decode json of
+    Data.Either.Left error -> Data.Either.Left (Data.Argonaut.Decode.Error.printJsonDecodeError error)
+    Data.Either.Right greeting -> Data.Either.Right greeting
 ```
 
 If we try decoding and encoding now, we get something closer to what we wanted:
 
 ```PureScript
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{}""" :: Data.Either.Either String Greeting
-(Left "JSON was missing expected field: name")
+> parse'' """{}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"title": "wonderful"}""" :: Data.Either.Either String Greeting
-(Left "JSON was missing expected field: name")
+> parse'' """{"title": "wonderful"}"""
+(Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat"}""" :: Data.Either.Either String Greeting
+> parse'' """{"name": "Pat"}"""
 (Right (Greeting { name: "Pat", title: Nothing }))
 
-> Data.Argonaut.Decode.Class.decodeJson =<< Data.Argonaut.Parser.jsonParser """{"name": "Pat", "title": "Dr."}""" :: Data.Either.Either String Greeting
+> parse'' """{"name": "Pat", "title": "Dr."}"""
 (Right (Greeting { name: "Pat", title: (Just "Dr.") }))
 
 > Data.Argonaut.Core.stringify (Data.Argonaut.Encode.Class.encodeJson (Greeting { name: "Pat", title: Data.Maybe.Nothing }))
