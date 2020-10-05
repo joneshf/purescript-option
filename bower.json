@@ -37,6 +37,7 @@
   "devDependencies": {
     "purescript-aff": ">= 5.0.0 < 6",
     "purescript-datetime": ">= 3.0.0 < 5.0.0",
+    "purescript-foldable-traversable": ">= 4.0.0 < 5.0.0",
     "purescript-psci-support": ">= 4.0.0 < 5",
     "purescript-spec": ">= 4.0.0 < 5"
   }

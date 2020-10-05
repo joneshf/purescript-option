@@ -4,16 +4,29 @@
 -- | E.g. `Record (foo :: Boolean, bar :: Int)` means that both `foo` and `bar` exist and with values all of the time.
 -- |
 -- | Variants capture the idea of a collection of key/value pairs where exactly one of the key/value pairs exist.
--- | E.g. `Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
+-- | E.g. `Data.Variant.Variant (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value or only `bar` exists with a value, but not both at the same time.
 -- |
 -- | Options capture the idea of a collection of key/value pairs where any key and value may or may not exist.
--- | E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
+-- | E.g. `Option.Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
 -- |
 -- | The distinction between these data types means that we can describe problems more accurately.
 -- | Options are typically what you find in dynamic languages or in weakly-typed static languages.
 -- | Their use cases range from making APIs more flexible to interfacing with serialization formats to providing better ergonomics around data types.
+-- |
+-- | These data types are all specific to the PureScript language.
+-- | Different data types exist in other languages that combine some of these ideas.
+-- | In many languages records are a combination of both PureScript-style records and PureScript-style options.
+-- | E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
+-- |
+-- | Other languages might signify optional fields with a question mark.
+-- | E.g. In TypeScript, the previous example would be `{ foo: boolean; bar?: number }`
+-- |
+-- | This is different from a required field with an optional value.
+-- | In PureScript, we might signify that by using: `Record (foo :: Boolean, bar :: Data.Maybe.Maybe Int)`.
+-- | In TypeScript, we might signify that by using: `{ foo: boolean; bar: number | null }`
 module Option
   ( Option
+  , Record
   , alter
   , fromRecord
   , fromRecordWithRequired
@@ -27,8 +40,14 @@ module Option
   , insert
   , insert'
   , jsonCodec
+  , jsonCodecRecord
   , modify
   , modify'
+  , optional
+  , recordFromRecord
+  , recordSet
+  , recordToRecord
+  , required
   , set
   , set'
   , toRecord
@@ -68,18 +87,23 @@ module Option
   , jsonCodec'
   , class JsonCodecOption
   , jsonCodecOption
+  , class JsonCodecRequired
+  , jsonCodecRequired
   , class Modify
   , modify''
   , class ModifyOption
   , modifyOption
   , class OrdOption
   , compareOption
+  , class Partition
   , class ReadForeignOption
   , readImplOption
   , class Set
   , set''
   , class SetOption
   , setOption
+  , class SetRequired
+  , setRequired
   , class ShowOption
   , showOption
   , class ToRecord
@@ -91,6 +115,7 @@ module Option
   ) where
 
 import Prelude
+import Prim hiding (Record)
 import Control.Monad.Except as Control.Monad.Except
 import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
 import Control.Monad.Writer as Control.Monad.Writer
@@ -98,13 +123,14 @@ import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
-import Data.Argonaut.Encode.Combinators as Data.Argonaut.Encode.Combinators
 import Data.Codec as Data.Codec
 import Data.Codec.Argonaut as Data.Codec.Argonaut
 import Data.Either as Data.Either
 import Data.List as Data.List
 import Data.Maybe as Data.Maybe
 import Data.Profunctor.Star as Data.Profunctor.Star
+import Data.Show as Data.Show
+import Data.String as Data.String
 import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
 import Foreign as Foreign
@@ -112,10 +138,11 @@ import Foreign.Index as Foreign.Index
 import Foreign.Object as Foreign.Object
 import Prim.Row as Prim.Row
 import Prim.RowList as Prim.RowList
+import Prim.TypeError as Prim.TypeError
 import Record as Record
 import Record.Builder as Record.Builder
 import Simple.JSON as Simple.JSON
-import Type.Equality as Type.Equality
+import Type.Data.RowList as Type.Data.RowList
 import Unsafe.Coerce as Unsafe.Coerce
 
 -- | A collection of key/value pairs where any key and value may or may not exist.
@@ -160,7 +187,7 @@ instance encodeJsonOptionOption ::
   encodeJson ::
     Option option ->
     Data.Argonaut.Core.Json
-  encodeJson = encodeJsonOption (Proxy :: Proxy list)
+  encodeJson option = Data.Argonaut.Core.fromObject (encodeJsonOption (Proxy :: Proxy list) option)
 
 instance eqOptionOption ::
   ( EqOption list option
@@ -235,6 +262,219 @@ instance writeForeignOptionOption ::
     Foreign.Foreign
   writeImpl = writeForeignOption (Proxy :: Proxy list)
 
+-- | A combination of both language-level records and options.
+-- | E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
+newtype Record (required :: # Type) (optional :: # Type)
+  = Record
+  { required :: Prim.Record required
+  , optional :: Option optional
+  }
+
+derive newtype instance eqRecordRequiredOptional ::
+  ( Eq (Option optional)
+  , Eq (Prim.Record required)
+  ) =>
+  Eq (Record required optional)
+
+derive newtype instance ordRecordRequiredOptional ::
+  ( Ord (Option optional)
+  , Ord (Prim.Record required)
+  ) =>
+  Ord (Record required optional)
+
+-- | For required fields:
+-- |
+-- | If a key does not exist in the JSON object, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given JSON object.
+-- |
+-- | If a key does not exist in the JSON object, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+instance decodeJsonRecordRequiredOptional ::
+  ( Data.Argonaut.Decode.Class.DecodeJson (Option optional)
+  , Data.Argonaut.Decode.Class.DecodeJson (Prim.Record required)
+  ) =>
+  Data.Argonaut.Decode.Class.DecodeJson (Record required optional) where
+  decodeJson ::
+    Data.Argonaut.Core.Json ->
+    Data.Either.Either String (Record required optional)
+  decodeJson json = case Data.Argonaut.Decode.Class.decodeJson json of
+    Data.Either.Left error -> Data.Either.Left error
+    Data.Either.Right required' -> case Data.Argonaut.Decode.Class.decodeJson json of
+      Data.Either.Left error -> Data.Either.Left error
+      Data.Either.Right optional' ->
+        Data.Either.Right
+          ( recordFromRecordAndOption
+              { optional: optional'
+              , required: required'
+              }
+          )
+
+-- | For required fields:
+-- |
+-- | Every key in the given `Option.Record _ _` is encoded like normal and added to the JSON object.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the JSON object.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it encodes it like normal and adds it to the JSON object.
+instance encodeJsonRecordRequiredOptional ::
+  ( Data.Argonaut.Encode.Class.GEncodeJson required requiredList
+  , EncodeJsonOption optionalList optional
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
+  ) =>
+  Data.Argonaut.Encode.Class.EncodeJson (Record required optional) where
+  encodeJson ::
+    Record required optional ->
+    Data.Argonaut.Core.Json
+  encodeJson record =
+    Data.Argonaut.Core.fromObject
+      ( Foreign.Object.union
+          requiredJSON
+          optionalJSON
+      )
+    where
+    optionalJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
+    optionalJSON = encodeJsonOption optionalProxy (optional record)
+
+    optionalProxy :: Type.Data.RowList.RLProxy optionalList
+    optionalProxy = Type.Data.RowList.RLProxy
+
+    requiredJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
+    requiredJSON = Data.Argonaut.Encode.Class.gEncodeJson (required record) requiredProxy
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
+
+-- | For required fields:
+-- |
+-- | If a key does not exist in the `Foreign.Foreign`, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` but the value cannot be successfully read, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` and the value can be successfully read, it will be added to the `Option.Record _ _`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given `Foreign.Foreign`.
+-- |
+-- | If a key does not exist in the `Foreign.Foreign`, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` but the value cannot be successfully read, it will fail with an error.
+-- |
+-- | If a key does exists in the `Foreign.Foreign` and the value can be successfully read, it will be added to the `Option.Record _ _`.
+instance readForeignRecordRequiredOptional ::
+  ( Simple.JSON.ReadForeign (Option optional)
+  , Simple.JSON.ReadForeign (Prim.Record required)
+  ) =>
+  Simple.JSON.ReadForeign (Record required optional) where
+  readImpl ::
+    Foreign.Foreign ->
+    Foreign.F (Record required optional)
+  readImpl foreign' = do
+    required' <- Simple.JSON.readImpl foreign'
+    optional' <- Simple.JSON.readImpl foreign'
+    pure
+      ( recordFromRecordAndOption
+          { optional: optional'
+          , required: required'
+          }
+      )
+
+instance showRecord ::
+  ( Data.Show.ShowRecordFields requiredList required
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
+  , ShowOption optionalList optional
+  ) =>
+  Show (Record required optional) where
+  show ::
+    Record required optional ->
+    String
+  show record' = "(Option.recordFromRecord {" <> go <> "})"
+    where
+    go :: String
+    go = case requiredFields of
+      [] -> case optionalFields of
+        Data.List.Cons x Data.List.Nil -> " " <> x <> " "
+        Data.List.Cons x y -> " " <> go' x y <> " "
+        Data.List.Nil -> ""
+      fields -> case optionalFields of
+        Data.List.Cons x Data.List.Nil -> " " <> Data.String.joinWith ", " fields <> ", " <> x <> " "
+        Data.List.Cons x y -> " " <> Data.String.joinWith ", " fields <> ", " <> go' x y <> " "
+        Data.List.Nil -> " " <> Data.String.joinWith ", " fields <> " "
+
+    go' ::
+      String ->
+      Data.List.List String ->
+      String
+    go' acc fields' = case fields' of
+      Data.List.Cons field fields -> go' (acc <> ", " <> field) fields
+      Data.List.Nil -> acc
+
+    optionalFields :: Data.List.List String
+    optionalFields = showOption optionalProxy (optional record')
+
+    optionalProxy :: Type.Data.RowList.RLProxy optionalList
+    optionalProxy = Type.Data.RowList.RLProxy
+
+    requiredFields :: Array String
+    requiredFields = Data.Show.showRecordFields requiredProxy (required record')
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
+
+-- | For required fields:
+-- |
+-- | Every key in the given `Option.Record _ _` is written like normal and added to the `Foreign.Foreign`.
+-- |
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the `Foreign`.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it writes it like normal and adds it to the `Foreign.Foreign`.
+instance writeForeignRecordRequiredOptional ::
+  ( Simple.JSON.WriteForeign (Option optional)
+  , Simple.JSON.WriteForeign (Prim.Record required)
+  ) =>
+  Simple.JSON.WriteForeign (Record required optional) where
+  writeImpl ::
+    Record required optional ->
+    Foreign.Foreign
+  writeImpl record =
+    Foreign.unsafeToForeign
+      ( Foreign.Object.union
+          requiredObject
+          optionalObject
+      )
+    where
+    optionalForeign :: Foreign.Foreign
+    optionalForeign = Simple.JSON.writeImpl (optional record)
+
+    optionalObject :: Foreign.Object.Object Foreign.Foreign
+    optionalObject = Foreign.unsafeFromForeign optionalForeign
+
+    requiredForeign :: Foreign.Foreign
+    requiredForeign = Simple.JSON.writeImpl (required record)
+
+    requiredObject :: Foreign.Object.Object Foreign.Foreign
+    requiredObject = Foreign.unsafeFromForeign requiredForeign
+
 -- | A typeclass that manipulates the values in an `Option _`.
 -- |
 -- | If the field exists in the `Option _`, the given function is applied to the value.
@@ -251,7 +491,7 @@ instance writeForeignOptionOption ::
 -- | ```
 class Alter (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
   alter'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -262,7 +502,7 @@ instance alterAny ::
   ) =>
   Alter record option' option where
   alter'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   alter'' record option = alterOption (Proxy :: Proxy list) record option
@@ -272,7 +512,7 @@ class AlterOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: 
   alterOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -281,7 +521,7 @@ instance alterOptionNil ::
   alterOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   alterOption _ _ option = option
@@ -298,7 +538,7 @@ else instance alterOptionCons ::
   alterOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value' -> Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   alterOption _ record oldOption = case recordValue optionValue of
@@ -388,7 +628,7 @@ else instance decodeJsonOptionCons ::
 -- | ```
 class Delete (record :: # Type) (option' :: # Type) (option :: # Type) | record option' -> option, record option -> option', option' option -> record where
   delete'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -399,7 +639,7 @@ instance deleteAny ::
   ) =>
   Delete record option' option where
   delete'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   delete'' = deleteOption (Proxy :: Proxy list)
@@ -409,7 +649,7 @@ class DeleteOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   deleteOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -418,7 +658,7 @@ instance deleteOptionNil ::
   deleteOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   deleteOption _ _ option = option
@@ -432,7 +672,7 @@ else instance deleteOptionCons ::
   deleteOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label Unit list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   deleteOption _ record option' = deleteOption proxy record option
@@ -455,7 +695,7 @@ class EncodeJsonOption (list :: Prim.RowList.RowList) (option :: # Type) | list 
     forall proxy.
     proxy list ->
     Option option ->
-    Data.Argonaut.Core.Json
+    Foreign.Object.Object Data.Argonaut.Core.Json
 
 instance encodeJsonOptionNil ::
   EncodeJsonOption Prim.RowList.Nil option where
@@ -463,8 +703,8 @@ instance encodeJsonOptionNil ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option option ->
-    Data.Argonaut.Core.Json
-  encodeJsonOption _ _ = Data.Argonaut.Core.jsonEmptyObject
+    Foreign.Object.Object Data.Argonaut.Core.Json
+  encodeJsonOption _ _ = Foreign.Object.empty
 else instance encodeJsonOptionCons ::
   ( Data.Argonaut.Encode.Class.EncodeJson value
   , Data.Symbol.IsSymbol label
@@ -476,18 +716,16 @@ else instance encodeJsonOptionCons ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
     Option option ->
-    Data.Argonaut.Core.Json
+    Foreign.Object.Object Data.Argonaut.Core.Json
   encodeJsonOption _ option = case value' of
     Data.Maybe.Just value ->
-      Data.Argonaut.Encode.Combinators.extend
-        ( Data.Argonaut.Encode.Combinators.assoc
-            key
-            (Data.Argonaut.Encode.Class.encodeJson value)
-        )
+      Foreign.Object.insert
+        key
+        (Data.Argonaut.Encode.Class.encodeJson value)
         json
     Data.Maybe.Nothing -> json
     where
-    json :: Data.Argonaut.Core.Json
+    json :: Foreign.Object.Object Data.Argonaut.Core.Json
     json = encodeJsonOption proxy option
 
     key :: String
@@ -587,62 +825,35 @@ class FromRecord (record :: # Type) (required :: # Type) (optional :: # Type) wh
   -- |
   -- | E.g. The following definitions are valid.
   -- | ```PureScript
-  -- | option1 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option1 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option1 = Option.fromRecord' { foo: true, bar: 31 }
   -- |
-  -- | option2 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option2 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option2 = Option.fromRecord' {}
   -- |
-  -- | option3 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( bar :: Int )
-  -- |     , required :: Record ( foo :: Boolean )
-  -- |     )
+  -- | option3 :: Option.Record ( foo :: Boolean ) ( bar :: Int )
   -- | option3 = Option.fromRecord' { foo: true }
   -- | ```
   -- |
   -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
   -- | ```PureScript
   -- | -- This will not work as it has the extra field `baz`
-  -- | option3 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option3 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option3 = Option.fromRecord' { foo: true, bar: 31, baz: "hi" }
   -- |
   -- | -- This will not work as it has the extra field `qux`
-  -- | option4 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ()
-  -- |     )
+  -- | option4 :: Option.Record () ( foo :: Boolean, bar :: Int )
   -- | option4 = Option.fromRecord' { qux: [] }
   -- | ```
   -- |
   -- | And, this definition is not valid as the given record lacks the required fields.
   -- | ```PureScript
-  -- | option5 ::
-  -- |   Record
-  -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
-  -- |     , required :: Record ( baz :: String )
-  -- |     )
+  -- | option5 :: Option.Record ( baz :: String ) ( foo :: Boolean, bar :: Int )
   -- | option5 = Option.fromRecord' { foo: true, bar: 31 }
   -- | ```
   fromRecord' ::
-    Record record ->
-    Record
-      ( optional :: Option optional
-      , required :: Record required
-      )
+    Prim.Record record ->
+    Record required optional
 
 -- | This instance converts a record into an option.
 -- |
@@ -658,15 +869,13 @@ instance fromRecordAny ::
   ) =>
   FromRecord record required optional where
   fromRecord' ::
-    Record record ->
-    Record
-      ( optional :: Option optional
-      , required :: Record required
-      )
+    Prim.Record record ->
+    Record required optional
   fromRecord' record =
-    { optional: fromRecordOption (Proxy :: Proxy optionalList) record
-    , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
-    }
+    recordFromRecordAndOption
+      { optional: fromRecordOption (Proxy :: Proxy optionalList) record
+      , required: Record.Builder.build (fromRecordRequired (Proxy :: _ requiredList) record) {}
+      }
 
 -- | A typeclass that iterates a `RowList` converting a `Record _` into an `Option _`.
 class FromRecordOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
@@ -676,14 +885,14 @@ class FromRecordOption (list :: Prim.RowList.RowList) (record :: # Type) (option
   fromRecordOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option
 
 instance fromRecordOptionNil :: FromRecordOption Prim.RowList.Nil record option where
   fromRecordOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option
   fromRecordOption _ _ = empty
 else instance fromRecordOptionConsMaybe ::
@@ -697,7 +906,7 @@ else instance fromRecordOptionConsMaybe ::
   fromRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option option
   fromRecordOption _ record = case value' of
     Data.Maybe.Just value -> insert label value option
@@ -725,7 +934,7 @@ else instance fromRecordOptionCons ::
   fromRecordOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option option
   fromRecordOption _ record = insert label value option
     where
@@ -749,15 +958,15 @@ class FromRecordRequired (list :: Prim.RowList.RowList) (record :: # Type) (requ
   fromRecordRequired ::
     forall proxy.
     proxy list ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record required)
 
 instance fromRecordRequiredNil :: FromRecordRequired Prim.RowList.Nil record () where
   fromRecordRequired ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record ())
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record ())
   fromRecordRequired _ _ = identity
 else instance fromRecordRequiredCons ::
   ( Data.Symbol.IsSymbol label
@@ -770,11 +979,11 @@ else instance fromRecordRequiredCons ::
   fromRecordRequired ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
-    Record.Builder.Builder (Record ()) (Record required)
+    Prim.Record record ->
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record required)
   fromRecordRequired _ record = first <<< rest
     where
-    first :: Record.Builder.Builder (Record required') (Record required)
+    first :: Record.Builder.Builder (Prim.Record required') (Prim.Record required)
     first = Record.Builder.insert label value
 
     label :: Data.Symbol.SProxy label
@@ -783,7 +992,7 @@ else instance fromRecordRequiredCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record ()) (Record required')
+    rest :: Record.Builder.Builder (Prim.Record ()) (Prim.Record required')
     rest = fromRecordRequired proxy record
 
     value :: value
@@ -827,9 +1036,9 @@ class Get (record' :: # Type) (option :: # Type) (record :: # Type) | option rec
   -- |     someOption
   -- | ```
   get'' ::
-    Record record' ->
+    Prim.Record record' ->
     Option option ->
-    Record record
+    Prim.Record record
 
 -- | This instance converts grabs the given fields of an `Option _`.
 instance getAny ::
@@ -847,9 +1056,9 @@ class GetOption (list :: Prim.RowList.RowList) (record' :: # Type) (option :: # 
   getOption ::
     forall proxy.
     proxy list ->
-    Record record' ->
+    Prim.Record record' ->
     Option option ->
-    Record record
+    Prim.Record record
 
 instance getOptionNil ::
   GetOption Prim.RowList.Nil record' option () where
@@ -874,7 +1083,7 @@ else instance getOptionConsFunction ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue ::
@@ -906,7 +1115,7 @@ else instance getOptionConsMaybe ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue :: Data.Maybe.Maybe value
@@ -933,7 +1142,7 @@ else instance getOptionConsValue ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record :: Record record'
+    record :: Prim.Record record'
     record = getOption proxy record' option
 
     recordValue :: value
@@ -974,7 +1183,7 @@ class GetAll (option :: # Type) (record :: # Type) | option -> record where
   -- | ```
   getAll' ::
     Option option ->
-    Data.Maybe.Maybe (Record record)
+    Data.Maybe.Maybe (Prim.Record record)
 
 -- | This instancce converts an `Option _` to a `Maybe (Record _)`.
 -- |
@@ -997,7 +1206,7 @@ class GetAllOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: 
     forall proxy.
     proxy list ->
     Option option ->
-    Data.Maybe.Maybe (Record record)
+    Data.Maybe.Maybe (Prim.Record record)
 
 instance getAllOptionNil ::
   GetAllOption Prim.RowList.Nil option () where
@@ -1022,7 +1231,7 @@ else instance getAllOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    record' :: Data.Maybe.Maybe (Record record')
+    record' :: Data.Maybe.Maybe (Prim.Record record')
     record' = getAllOption proxy option
 
     value' :: Data.Maybe.Maybe value
@@ -1044,7 +1253,7 @@ else instance getAllOptionCons ::
 -- | ```
 class Insert (record :: # Type) (option' :: # Type) (option :: # Type) where
   insert'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1055,7 +1264,7 @@ instance insertAny ::
   ) =>
   Insert record option' option where
   insert'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   insert'' = insertOption (Proxy :: Proxy list)
@@ -1065,7 +1274,7 @@ class InsertOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   insertOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1074,7 +1283,7 @@ instance insertOptionNil ::
   insertOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   insertOption _ _ option = option
@@ -1089,7 +1298,7 @@ else instance insertOptionConsMaybe ::
   insertOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   insertOption _ record oldOption = case value' of
@@ -1118,7 +1327,7 @@ else instance insertOptionConsValue ::
   insertOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   insertOption _ record oldOption = insert label value option
@@ -1135,25 +1344,26 @@ else instance insertOptionConsValue ::
     value :: value
     value = Record.get label record
 
--- | A typeclass that converts a record of `JsonCodec`s into a `JsonCodec` for an option.
+-- | A typeclass that converts a record of `Data.Codec.Argonaut.JsonCodec _`s into a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _`.
 -- |
--- | This is useful to provide a straight-forward `JsonCodec` for an `Option _`.
-class JsonCodec (record :: # Type) (option :: # Type) where
-  -- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
+-- | This is useful to provide a straight-forward `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _`.
+class JsonCodec (record :: # Type) (required :: # Type) (optional :: # Type) where
+  -- | Creates a `JsonCodec` for an `Option.Record _ _` given a `Record _` of `JsonCodec`s.
   -- |
   -- | E.g.
   -- | The `String` is used in errors when decoding fails.
   -- |
   -- | ```PureScript
   -- | type Example
-  -- |   = Option.Option
+  -- |   = Option.Record
   -- |       ( foo :: Boolean
-  -- |       , bar :: Int
+  -- |       )
+  -- |       ( bar :: Int
   -- |       )
   -- |
   -- | jsonCodec :: Data.Codec.Argonaut.JsonCodec Example
   -- | jsonCodec =
-  -- |   Option.jsonCodec
+  -- |   Option.jsonCodec'
   -- |     "Example"
   -- |     { foo: Data.Codec.Argonaut.boolean
   -- |     , bar: Data.Codec.Argonaut.int
@@ -1161,33 +1371,87 @@ class JsonCodec (record :: # Type) (option :: # Type) where
   -- | ```
   jsonCodec' ::
     String ->
-    Record record ->
-    Data.Codec.Argonaut.JsonCodec (Option option)
+    Prim.Record record ->
+    Data.Codec.Argonaut.JsonCodec (Record required optional)
 
--- | This instance ignores keys that do not exist in the given JSON object and does not insert keys that do not exist in the given `Option _`.
+-- | For required fields:
 -- |
--- | If a key does not exist in the JSON object, it will not be added to the `Option _`.
+-- | If a key does not exist in the JSON object, it will fail with an error.
 -- |
 -- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
 -- |
--- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option _`.
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
 -- |
--- | If a key does not exist in the given `Option _`, it is not added to the JSON object.
+-- | Every key in the given `Option.Record _ _` is encoded like normal and added it to the JSON object.
 -- |
--- | If a key does exists in the given `Option _`, it encodes it like normal and adds it to the JSON object.
-instance jsonCodecOptionAny ::
-  ( JsonCodecOption list record option
-  , Prim.RowList.RowToList record list
+-- | For optional fields:
+-- |
+-- | This instance ignores keys that do not exist in the given JSON object and does not insert keys that do not exist in the given `Option.Record _ _`.
+-- |
+-- | If a key does not exist in the JSON object, it will not be added to the `Option.Record _ _`.
+-- |
+-- | If a key does exists in the JSON object but the value cannot be successfully decoded, it will fail with an error.
+-- |
+-- | If a key does exists in the JSON object and the value can be successfully decoded, it will be added to the `Option.Record _ _`.
+-- |
+-- | If a key does not exist in the given `Option.Record _ _`, it is not added to the JSON object.
+-- |
+-- | If a key does exists in the given `Option.Record _ _`, it encodes it like normal and adds it to the JSON object.
+instance jsonCodecRecordRequiredOptional ::
+  ( JsonCodecOption optionalList record optional
+  , JsonCodecRequired requiredList record required
+  , Prim.RowList.RowToList optional optionalList
+  , Prim.RowList.RowToList required requiredList
   ) =>
-  JsonCodec record option where
+  JsonCodec record required optional where
   jsonCodec' ::
     String ->
-    Record record ->
-    Data.Codec.Argonaut.JsonCodec (Option option)
-  jsonCodec' name record =
-    Data.Codec.Argonaut.object
-      name
-      (jsonCodecOption (Proxy :: Proxy list) record)
+    Prim.Record record ->
+    Data.Codec.Argonaut.JsonCodec (Record required optional)
+  jsonCodec' name record' = Data.Codec.Argonaut.object name codec
+    where
+    codec :: Data.Codec.Argonaut.JPropCodec (Record required optional)
+    codec =
+      Data.Codec.GCodec
+        (Control.Monad.Reader.Trans.ReaderT decode)
+        (Data.Profunctor.Star.Star encode)
+
+    decode ::
+      Foreign.Object.Object Data.Argonaut.Core.Json ->
+      Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Record required optional)
+    decode object = case Data.Codec.decode requiredCodec object of
+      Data.Either.Left error -> Data.Either.Left error
+      Data.Either.Right required' -> case Data.Codec.decode optionalCodec object of
+        Data.Either.Left error -> Data.Either.Left error
+        Data.Either.Right optional' ->
+          Data.Either.Right
+            ( recordFromRecordAndOption
+                { optional: optional'
+                , required: required'
+                }
+            )
+
+    encode ::
+      Record required optional ->
+      Control.Monad.Writer.Writer
+        (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json))
+        (Record required optional)
+    encode record = do
+      Control.Monad.Writer.Class.tell (Data.Codec.encode requiredCodec (required record))
+      Control.Monad.Writer.Class.tell (Data.Codec.encode optionalCodec (optional record))
+      pure record
+
+    optionalCodec :: Data.Codec.Argonaut.JPropCodec (Option optional)
+    optionalCodec = jsonCodecOption optionalProxy record'
+
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
+
+    requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+    requiredCodec = jsonCodecRequired requiredProxy record'
+
+    requiredProxy :: Type.Data.RowList.RLProxy requiredList
+    requiredProxy = Type.Data.RowList.RLProxy
 
 -- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
 class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option :: # Type) | list -> option record where
@@ -1197,14 +1461,14 @@ class JsonCodecOption (list :: Prim.RowList.RowList) (record :: # Type) (option 
   jsonCodecOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
 
 instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option where
   jsonCodecOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ _ =
     Data.Codec.mapCodec
@@ -1214,23 +1478,22 @@ instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option wh
 else instance jsonCodecOptionCons ::
   ( Data.Symbol.IsSymbol label
   , JsonCodecOption list record option'
-  , Prim.Row.Cons label value' option' option
-  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value') record' record
+  , Prim.Row.Cons label value option' option
+  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value) record' record
   , Prim.Row.Lacks label option'
-  , Type.Equality.TypeEquals value (Data.Codec.Argonaut.JsonCodec value')
   ) =>
   JsonCodecOption (Prim.RowList.Cons label value list) record option where
   jsonCodecOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ record =
     Data.Codec.GCodec
       (Control.Monad.Reader.Trans.ReaderT decode)
       (Data.Profunctor.Star.Star encode)
     where
-    codec :: Data.Codec.Argonaut.JsonCodec value'
+    codec :: Data.Codec.Argonaut.JsonCodec value
     codec = Record.get label record
 
     decode ::
@@ -1272,6 +1535,85 @@ else instance jsonCodecOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
+-- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
+class JsonCodecRequired (list :: Prim.RowList.RowList) (record :: # Type) (required :: # Type) | list -> record required where
+  -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
+  -- |
+  -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
+  jsonCodecRequired ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+
+instance jsonCodecRequiredNil :: JsonCodecRequired Prim.RowList.Nil record () where
+  jsonCodecRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record ())
+  jsonCodecRequired _ _ =
+    Data.Codec.mapCodec
+      (\_ -> Data.Either.Right {})
+      (\_ -> {})
+      Data.Codec.Argonaut.record
+else instance jsonCodecRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , JsonCodecRequired list record required'
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Cons label (Data.Codec.Argonaut.JsonCodec value) record' record
+  , Prim.Row.Lacks label required'
+  ) =>
+  JsonCodecRequired (Prim.RowList.Cons label value list) record required where
+  jsonCodecRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Prim.Record record ->
+    Data.Codec.Argonaut.JPropCodec (Prim.Record required)
+  jsonCodecRequired _ record =
+    Data.Codec.GCodec
+      (Control.Monad.Reader.Trans.ReaderT decode)
+      (Data.Profunctor.Star.Star encode)
+    where
+    codec :: Data.Codec.Argonaut.JsonCodec value
+    codec = Record.get label record
+
+    decode ::
+      Foreign.Object.Object Data.Argonaut.Core.Json ->
+      Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Prim.Record required)
+    decode object' = do
+      required' <- Data.Codec.Argonaut.decode requiredCodec object'
+      case Foreign.Object.lookup key object' of
+        Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
+          Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
+          Data.Either.Right value -> Data.Either.Right (Record.insert label value required')
+        Data.Maybe.Nothing -> Data.Either.Left (Data.Codec.Argonaut.AtKey key Data.Codec.Argonaut.MissingValue)
+
+    encode ::
+      Prim.Record required ->
+      Control.Monad.Writer.Writer (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)) (Prim.Record required)
+    encode required' = do
+      Control.Monad.Writer.Class.tell
+        ( Data.List.Cons
+            (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codec (Record.get label required')))
+            Data.List.Nil
+        )
+      Control.Monad.Writer.Class.tell
+        (Data.Codec.Argonaut.encode requiredCodec (Record.delete label required'))
+      pure required'
+
+    key :: String
+    key = Data.Symbol.reflectSymbol label
+
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required')
+    requiredCodec = jsonCodecRequired proxy record
+
+    proxy :: Proxy list
+    proxy = Proxy
+
 -- | A typeclass that manipulates the values in an `Option _`.
 -- |
 -- | If the field exists in the `Option _`, the given function is applied to the value.
@@ -1288,7 +1630,7 @@ else instance jsonCodecOptionCons ::
 -- | ```
 class Modify (record :: # Type) (option' :: # Type) (option :: # Type) | record option -> option', record option' -> option where
   modify'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1299,7 +1641,7 @@ instance modifyAny ::
   ) =>
   Modify record option' option where
   modify'' ::
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
   modify'' record option = modifyOption (Proxy :: Proxy list) record option
@@ -1309,7 +1651,7 @@ class ModifyOption (list :: Prim.RowList.RowList) (record :: # Type) (option' ::
   modifyOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1318,7 +1660,7 @@ instance modifyOptionNil ::
   modifyOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   modifyOption _ _ option = option
@@ -1335,7 +1677,7 @@ else instance modifyOptionCons ::
   modifyOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (value' -> value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   modifyOption _ record oldOption = case optionValue of
@@ -1419,6 +1761,25 @@ else instance ordOptionCons ::
     rightValue :: Data.Maybe.Maybe value
     rightValue = get label right
 
+-- | A typeclass that iterates a `RowList` partitioning required rows from the optional rows.
+-- |
+-- | This is like the built in row-polymorphism,
+-- | except it only cares about the labels of the row.
+-- | The type can vary between the iterated `RowList` and the required/optional rows.
+-- | If it differs,
+-- | the type from the iterated `RowList` is used.
+class Partition (list :: Prim.RowList.RowList) (requiredInput :: Prim.RowList.RowList) (optionalInput :: Prim.RowList.RowList) (requiredOutput :: Prim.RowList.RowList) (optionalOutput :: Prim.RowList.RowList) | list optionalInput requiredInput -> optionalOutput requiredOutput
+
+instance partitionNilNilNil :: Partition Prim.RowList.Nil requiredInput optionalInput Prim.RowList.Nil Prim.RowList.Nil
+else instance partitionConsConsAny ::
+  ( Partition list requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label requiredValue list) (Prim.RowList.Cons label value requiredInput) optionalInput (Prim.RowList.Cons label requiredValue requiredOutput) optionalOutput
+else instance partitionConsAnyCons ::
+  ( Partition list requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label optionalValue list) requiredInput (Prim.RowList.Cons label value optionalInput) requiredOutput (Prim.RowList.Cons label optionalValue optionalOutput)
+
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
 class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
@@ -1473,44 +1834,58 @@ else instance readForeignOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
--- | A typeclass that sets values in an `Option _`.
+-- | A typeclass that sets values in an `Option.Record _ _`.
 -- |
--- | The keys must already exist in the option.
--- | If any keys might not already exist in the option,
+-- | The keys must already exist in the `Option.Record _ _`.
+-- | If any keys might not already exist in the `Option.Record _ _`,
 -- | `insert''` should be used instead.
 -- |
 -- | E.g.
 -- | ```PureScript
--- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | someOption = Option.empty
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someRecord = Option.fromRecord' { foo: true }
 -- |
--- | anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
--- | anotherOption = Option.set'' { bar: 31 } someOption
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | anotherRecord = Option.set'' { bar: 31 } someRecord
 -- | ```
-class Set (record :: # Type) (option' :: # Type) (option :: # Type) where
+class Set (record :: # Type) (requiredInput :: # Type) (optionalInput :: # Type) (requiredOutput :: # Type) (optionalOutput :: # Type) where
   set'' ::
-    Record record ->
-    Option option' ->
-    Option option
+    Prim.Record record ->
+    Record requiredInput optionalInput ->
+    Record requiredOutput optionalOutput
 
--- | This instance sets all values in an `Option _`.
+-- | This instance sets all values in an `Option.Record _ _`.
 instance setAny ::
-  ( Prim.RowList.RowToList record list
-  , SetOption list record option' option
+  ( Partition recordList requiredList' optionalList' requiredList optionalList
+  , Prim.RowList.RowToList optional' optionalList'
+  , Prim.RowList.RowToList record recordList
+  , Prim.RowList.RowToList required' requiredList'
+  , SetOption optionalList record optional' optional
+  , SetRequired requiredList record required' required
   ) =>
-  Set record option' option where
+  Set record required' optional' required optional where
   set'' ::
-    Record record ->
-    Option option' ->
-    Option option
-  set'' = setOption (Proxy :: Proxy list)
+    Prim.Record record ->
+    Record required' optional' ->
+    Record required optional
+  set'' record' record =
+    recordFromRecordAndOption
+      { optional: setOption optionalList record' (optional record)
+      , required: setRequired requiredList record' (required record)
+      }
+    where
+    optionalList :: Proxy optionalList
+    optionalList = Proxy
+
+    requiredList :: Proxy requiredList
+    requiredList = Proxy
 
 -- | A typeclass that iterates a `Prim.RowList.RowList` setting values in an `Option _`.
 class SetOption (list :: Prim.RowList.RowList) (record :: # Type) (option' :: # Type) (option :: # Type) | list option' -> option, option' record -> option where
   setOption ::
     forall proxy.
     proxy list ->
-    Record record ->
+    Prim.Record record ->
     Option option' ->
     Option option
 
@@ -1519,7 +1894,7 @@ instance setOptionNil ::
   setOption ::
     forall proxy.
     proxy Prim.RowList.Nil ->
-    Record record ->
+    Prim.Record record ->
     Option option ->
     Option option
   setOption _ _ option = option
@@ -1536,7 +1911,7 @@ else instance setOptionConsMaybe ::
   setOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   setOption _ record oldOption = case value' of
@@ -1572,7 +1947,7 @@ else instance setOptionCons ::
   setOption ::
     forall proxy.
     proxy (Prim.RowList.Cons label value list) ->
-    Record record ->
+    Prim.Record record ->
     Option oldOption ->
     Option option
   setOption _ record oldOption = insert label value option
@@ -1585,6 +1960,57 @@ else instance setOptionCons ::
 
     option :: Option option'
     option = setOption proxy record oldOption'
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    value :: value
+    value = Record.get label record
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` setting values in a `Record _`.
+class SetRequired (list :: Prim.RowList.RowList) (record :: # Type) (required' :: # Type) (required :: # Type) | list required' -> required, required' record -> required where
+  setRequired ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Prim.Record required' ->
+    Prim.Record required
+
+instance setRequiredNil ::
+  SetRequired Prim.RowList.Nil record required required where
+  setRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Prim.Record required ->
+    Prim.Record required
+  setRequired _ _ record = record
+else instance setRequiredCons ::
+  ( Data.Symbol.IsSymbol label
+  , Prim.Row.Cons label value record' record
+  , Prim.Row.Cons label value required' required
+  , Prim.Row.Cons label value' oldRequired' oldRequired
+  , Prim.Row.Lacks label oldRequired'
+  , Prim.Row.Lacks label required'
+  , SetRequired list record oldRequired' required'
+  ) =>
+  SetRequired (Prim.RowList.Cons label value list) record oldRequired required where
+  setRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons label value list) ->
+    Prim.Record record ->
+    Prim.Record oldRequired ->
+    Prim.Record required
+  setRequired _ record oldRequired = Record.insert label value newRequired
+    where
+    label :: Data.Symbol.SProxy label
+    label = Data.Symbol.SProxy
+
+    oldRequired' :: Prim.Record oldRequired'
+    oldRequired' = Record.delete label oldRequired
+
+    newRequired :: Prim.Record required'
+    newRequired = setRequired proxy record oldRequired'
 
     proxy :: Proxy list
     proxy = Proxy
@@ -1642,9 +2068,10 @@ else instance showOptionCons ::
     value' :: Data.Maybe.Maybe value
     value' = get label option
 
--- | A typeclass for converting an `Option _` into a `Record _`.
+-- | A typeclass for converting an `Option.Record _ _` into a `Record _`.
 -- |
--- | Since there is syntax for operating on records, but no syntax for operating on options, this typeclass can be useful for providing an easier to use interface to options.
+-- | Since there is syntax for operating on records, but no syntax for operating on `Option.Record _ _`.
+-- | This typeclass can be useful for providing an easier to use interface to `Option.Record _ _`.
 -- |
 -- | E.g. Someone can say:
 -- | ```PureScript
@@ -1656,36 +2083,53 @@ else instance showOptionCons ::
 -- | ```
 -- |
 -- | Not only does it save a bunch of typing, it also mitigates the need for a direct dependency on `SProxy _`.
-class ToRecord (option :: # Type) (record :: # Type) | option -> record where
-  -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
+class ToRecord (required :: # Type) (optional :: # Type) (record :: # Type) | optional required -> record where
+  -- | The expected `Record record` will have the same fields as the given `Option.Record required optional` where each optional type is wrapped in a `Maybe`.
   -- |
   -- | E.g.
   -- | ```PureScript
-  -- | someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+  -- | someOption :: Option.Record ( foo :: Boolean ) ( bar :: Int )
   -- | someOption = Option.fromRecord' { foo: true, bar: 31 }
   -- |
-  -- | someRecord :: Record ( foo :: Data.Maybe.Maybe Boolean, bar :: Data.Maybe.Maybe Int )
+  -- | someRecord :: Record ( foo :: Boolean, bar :: Data.Maybe.Maybe Int )
   -- | someRecord = Option.toRecord' someOption
   -- | ```
   toRecord' ::
-    Option option ->
-    Record record
+    Record required optional ->
+    Prim.Record record
 
--- | This instance converts an option into a record.
+-- | This instance converts an `Option.Record _ _` into a `Record _`.
 -- |
--- | Every field in the option is added to a record with a `Maybe _` type.
+-- | Every required field in the `Option.Record _ _` is added to the `Record _` with a `_` type.
+-- | Every optional field in the `Option.Record _ _` is added to the `Record _` with a `Maybe _` type.
 -- |
--- | All fields in the option that exist will have the value `Just _`.
--- | All fields in the option that do not exist will have the value `Nothing`.
+-- | All optional fields in the `Option.Record _ _` that exist will have the value `Just _`.
+-- | All optional fields in the `Option.Record _ _` that do not exist will have the value `Nothing`.
 instance toRecordAny ::
-  ( ToRecordOption list option record
-  , Prim.RowList.RowToList record list
+  ( Prim.Row.Nub record record
+  , Prim.Row.Union required optionalRecord record
+  , Prim.RowList.RowToList optional optionalList
+  , ToRecordOption optionalList optional optionalRecord
   ) =>
-  ToRecord option record where
+  ToRecord required optional record where
   toRecord' ::
-    Option option ->
-    Record record
-  toRecord' option = Record.Builder.build (toRecordOption (Proxy :: Proxy list) option) {}
+    Record required optional ->
+    Prim.Record record
+  toRecord' record =
+    Record.Builder.build
+      ( requiredBuilder
+          <<< optionalBuilder
+      )
+      {}
+    where
+    optionalBuilder :: Record.Builder.Builder (Prim.Record ()) (Prim.Record optionalRecord)
+    optionalBuilder = toRecordOption optionalProxy (optional record)
+
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
+
+    requiredBuilder :: Record.Builder.Builder (Prim.Record optionalRecord) (Prim.Record record)
+    requiredBuilder = Record.Builder.disjointUnion (required record)
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` into a `Record _`.
 class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :: # Type) | list -> option record where
@@ -1696,7 +2140,7 @@ class ToRecordOption (list :: Prim.RowList.RowList) (option :: # Type) (record :
     forall proxy.
     proxy list ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record record)
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record record)
 
 instance toRecordOptionNil ::
   ToRecordOption Prim.RowList.Nil option () where
@@ -1704,7 +2148,7 @@ instance toRecordOptionNil ::
     forall proxy.
     proxy Prim.RowList.Nil ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record ())
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record ())
   toRecordOption _ _ = identity
 else instance toRecordOptionCons ::
   ( Data.Symbol.IsSymbol label
@@ -1713,15 +2157,15 @@ else instance toRecordOptionCons ::
   , Prim.Row.Lacks label record'
   , ToRecordOption list option record'
   ) =>
-  ToRecordOption (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) option record where
+  ToRecordOption (Prim.RowList.Cons label value list) option record where
   toRecordOption ::
     forall proxy.
-    proxy (Prim.RowList.Cons label (Data.Maybe.Maybe value) list) ->
+    proxy (Prim.RowList.Cons label value list) ->
     Option option ->
-    Record.Builder.Builder (Record ()) (Record record)
+    Record.Builder.Builder (Prim.Record ()) (Prim.Record record)
   toRecordOption _ option = first <<< rest
     where
-    first :: Record.Builder.Builder (Record record') (Record record)
+    first :: Record.Builder.Builder (Prim.Record record') (Prim.Record record)
     first = Record.Builder.insert label value
 
     label :: Data.Symbol.SProxy label
@@ -1730,7 +2174,7 @@ else instance toRecordOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
-    rest :: Record.Builder.Builder (Record ()) (Record record')
+    rest :: Record.Builder.Builder (Prim.Record ()) (Prim.Record record')
     rest = toRecordOption proxy option
 
     value :: Data.Maybe.Maybe value
@@ -1808,7 +2252,7 @@ else instance writeForeignOptionCons ::
 alter ::
   forall option option' record.
   Alter record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 alter record option = alter'' record option
@@ -1879,7 +2323,7 @@ delete proxy option = (alter' go proxy option).option
 delete' ::
   forall option option' record.
   Delete record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 delete' = delete''
@@ -1921,18 +2365,14 @@ empty = Option Foreign.Object.empty
 -- | option4 = Option.fromRecord { qux: [] }
 -- | ```
 fromRecord ::
-  forall option record.
-  FromRecord record () option =>
-  Record record ->
-  Option option
-fromRecord record = result.optional
+  forall optional record.
+  FromRecord record () optional =>
+  Prim.Record record ->
+  Option optional
+fromRecord record' = optional record
   where
-  result ::
-    Record
-      ( optional :: Option option
-      , required :: Record ()
-      )
-  result = fromRecord' record
+  record :: Record () optional
+  record = fromRecord' record'
 
 -- | The given `Record record` must have no more fields than expected.
 -- |
@@ -1943,21 +2383,21 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option1 = Option.fromRecord { foo: true, bar: 31 }
+-- | option1 = Option.fromRecordWithRequired { foo: true, bar: 31 }
 -- |
 -- | option2 ::
 -- |   Record
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option2 = Option.fromRecord {}
+-- | option2 = Option.fromRecordWithRequired {}
 -- |
 -- | option3 ::
 -- |   Record
 -- |     ( optional :: Option.Option ( bar :: Int )
 -- |     , required :: Record ( foo :: Boolean )
 -- |     )
--- | option3 = Option.fromRecord { foo: true }
+-- | option3 = Option.fromRecordWithRequired { foo: true }
 -- | ```
 -- |
 -- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
@@ -1968,7 +2408,7 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option3 = Option.fromRecord { foo: true, bar: 31, baz: "hi" }
+-- | option3 = Option.fromRecordWithRequired { foo: true, bar: 31, baz: "hi" }
 -- |
 -- | -- This will not work as it has the extra field `qux`
 -- | option4 ::
@@ -1976,7 +2416,7 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ()
 -- |     )
--- | option4 = Option.fromRecord { qux: [] }
+-- | option4 = Option.fromRecordWithRequired { qux: [] }
 -- | ```
 -- |
 -- | And, this definition is not valid as the given record lacks the required fields.
@@ -1986,19 +2426,30 @@ fromRecord record = result.optional
 -- |     ( optional :: Option.Option ( foo :: Boolean, bar :: Int )
 -- |     , required :: Record ( baz :: String )
 -- |     )
--- | option5 = Option.fromRecord { foo: true, bar: 31 }
+-- | option5 = Option.fromRecordWithRequired { foo: true, bar: 31 }
 -- | ```
 -- |
 -- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
 fromRecordWithRequired ::
-  forall option required record.
-  FromRecord record required option =>
-  Record record ->
-  Record
-    ( optional :: Option option
-    , required :: Record required
+  forall optional record required.
+  FromRecord record required optional =>
+  Prim.TypeError.Warn
+    ( Prim.TypeError.Above
+        (Prim.TypeError.Text "`Option.fromRecordWithRequired` is deprecated and will be removed in v6.0.0.")
+        (Prim.TypeError.Text "Use `Option.recordFromRecord` instead.")
+    ) =>
+  Prim.Record record ->
+  Prim.Record
+    ( optional :: Option optional
+    , required :: Prim.Record required
     )
-fromRecordWithRequired = fromRecord'
+fromRecordWithRequired record' =
+  { optional: optional record
+  , required: required record
+  }
+  where
+  record :: Record required optional
+  record = fromRecord' record'
 
 -- | Attempts to fetch the value at the given key from an option.
 -- |
@@ -2067,9 +2518,9 @@ get proxy option = (alter' go proxy option).value
 get' ::
   forall option record record'.
   Get record' option record =>
-  Record record' ->
+  Prim.Record record' ->
   Option option ->
-  Record record
+  Prim.Record record
 get' record option = get'' record option
 
 -- | Attempts to fetch all of the values from all of the keys of an option.
@@ -2095,7 +2546,7 @@ getAll ::
   forall option record.
   GetAll option record =>
   Option option ->
-  Data.Maybe.Maybe (Record record)
+  Data.Maybe.Maybe (Prim.Record record)
 getAll = getAll'
 
 -- | Attempts to fetch the value at the given key from an option falling back to the default.
@@ -2201,12 +2652,12 @@ insertField proxy option = (alter' go proxy option).option
 insert' ::
   forall option option' record.
   Insert record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 insert' = insert''
 
--- | Creates a `JsonCodec` for an `Option _` given a `Record _` of `JsonCodec`s.
+-- | Creates a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Option _` given a `Record _` of `Data.Codec.Argonaut.JsonCodec _`s.
 -- |
 -- | The `String` is used in errors when decoding fails.
 -- |
@@ -2226,15 +2677,65 @@ insert' = insert''
 -- |     , bar: Data.Codec.Argonaut.int
 -- |     }
 -- | ```
+jsonCodec ::
+  forall optional record.
+  JsonCodec record () optional =>
+  String ->
+  Prim.Record record ->
+  Data.Codec.Argonaut.JsonCodec (Option optional)
+jsonCodec name record' = Data.Codec.basicCodec decode encode
+  where
+  codec :: Data.Codec.Argonaut.JsonCodec (Record () optional)
+  codec = jsonCodec' name record'
+
+  decode ::
+    Data.Argonaut.Core.Json ->
+    Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option optional)
+  decode json = case Data.Codec.decode codec json of
+    Data.Either.Left error -> Data.Either.Left error
+    Data.Either.Right record -> Data.Either.Right (optional record)
+
+  encode ::
+    Option optional ->
+    Data.Argonaut.Core.Json
+  encode option =
+    Data.Codec.encode codec
+      ( recordFromRecordAndOption
+          { optional: option
+          , required: {}
+          }
+      )
+
+-- | Creates a `Data.Codec.Argonaut.JsonCodec _` for an `Option.Record _ _` given a `Record _` of `Data.Codec.Argonaut.JsonCodec _`s.
+-- |
+-- | The `String` is used in errors when decoding fails.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | type Example
+-- |   = Option.Record
+-- |       ( foo :: Boolean
+-- |       )
+-- |       ( bar :: Int
+-- |       )
+-- |
+-- | jsonCodec :: Data.Codec.Argonaut.JsonCodec Example
+-- | jsonCodec =
+-- |   Option.jsonCodecRecord
+-- |     "Example"
+-- |     { foo: Data.Codec.Argonaut.boolean
+-- |     , bar: Data.Codec.Argonaut.int
+-- |     }
+-- | ```
 -- |
 -- | This is an alias for `jsonCodec'` so the documentation is a bit clearer.
-jsonCodec ::
-  forall option record.
-  JsonCodec record option =>
+jsonCodecRecord ::
+  forall optional record required.
+  JsonCodec record required optional =>
   String ->
-  Record record ->
-  Data.Codec.Argonaut.JsonCodec (Option option)
-jsonCodec = jsonCodec'
+  Prim.Record record ->
+  Data.Codec.Argonaut.JsonCodec (Record required optional)
+jsonCodecRecord name record' = jsonCodec' name record'
 
 -- | Manipulates the value of a key in an option.
 -- |
@@ -2287,10 +2788,135 @@ modify proxy f option = (alter' go proxy option).option
 modify' ::
   forall option option' record.
   Modify record option' option =>
-  Record record ->
+  Prim.Record record ->
   Option option' ->
   Option option
 modify' record option = modify'' record option
+
+-- | Retrieves all the optional fields from the given `Option.Record _ _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int, qux :: String )
+-- | someRecord = Option.recordFromRecord { foo: false }
+-- |
+-- | someOption :: Option.Option ( bar :: Int, qux :: String )
+-- | someOption = Option.optional someRecord
+-- | ```
+optional ::
+  forall required optional.
+  Record required optional ->
+  Option optional
+optional record' = case record' of
+  Record record -> record.optional
+
+-- | The given `Record record` must have no more fields than expected.
+-- |
+-- | E.g. The following definitions are valid.
+-- | ```PureScript
+-- | option1 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option1 = Option.recordFromRecord { foo: true, bar: 31 }
+-- |
+-- | option2 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option2 = Option.recordFromRecord {}
+-- |
+-- | option3 :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | option3 = Option.recordFromRecord { foo: true }
+-- | ```
+-- |
+-- | However, the following definitions are not valid as the given records have more fields than the expected `Option _`.
+-- | ```PureScript
+-- | -- This will not work as it has the extra field `baz`
+-- | option3 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option3 = Option.recordFromRecord { foo: true, bar: 31, baz: "hi" }
+-- |
+-- | -- This will not work as it has the extra field `qux`
+-- | option4 :: Option.Record () ( foo :: Boolean, bar :: Int )
+-- | option4 = Option.recordFromRecord { qux: [] }
+-- | ```
+-- |
+-- | And, this definition is not valid as the given record lacks the required fields.
+-- | ```PureScript
+-- | option5 :: Option.Record ( baz :: String ) ( foo :: Boolean, bar :: Int )
+-- | option5 = Option.recordFromRecord { foo: true, bar: 31 }
+-- | ```
+-- |
+-- | This is an alias for `fromRecord'` so the documentation is a bit clearer.
+recordFromRecord ::
+  forall optional required record.
+  FromRecord record required optional =>
+  Prim.Record record ->
+  Record required optional
+recordFromRecord record = fromRecord' record
+
+recordFromRecordAndOption ::
+  forall optional required.
+  { optional :: Option optional
+  , required :: Prim.Record required
+  } ->
+  Record required optional
+recordFromRecordAndOption record =
+  Record
+    { optional: record.optional
+    , required: record.required
+    }
+
+-- | Sets the given key/values in an `Option.Record _ _`.
+-- | The key must already exist in the `Option.Record _ _`.
+-- | If the key might not already exist in the `Option.Record _ _`, `recordInsert` should be used instead.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someRecord = Option.recordFromRecord { foo: true }
+-- |
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | anotherRecord = Option.recordSet { bar: 31 } someRecord
+-- | ```
+-- | This is an alias for `set''` so the documentation is a bit clearer.
+recordSet ::
+  forall optional optional' record required required'.
+  Set record required' optional' required optional =>
+  Prim.Record record ->
+  Record required' optional' ->
+  Record required optional
+recordSet record' record = set'' record' record
+
+-- | The expected `Record record` will have the same fields as the given `Option.Record required optional` where each optional type is wrapped in a `Maybe`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someOption = Option.recordFromRecord { foo: true, bar: 31 }
+-- |
+-- | someRecord :: Record ( foo :: Boolean, bar :: Data.Maybe.Maybe Int )
+-- | someRecord = Option.toRecord someOption
+-- | ```
+-- |
+-- | This is an alias for `toRecord'` so the documentation is a bit clearer.
+recordToRecord ::
+  forall optional record required.
+  ToRecord required optional record =>
+  Record required optional ->
+  Prim.Record record
+recordToRecord record = toRecord' record
+
+-- | Retrieves all of the required fields from the given `Option.Record _ _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean, bar :: Int ) ( qux :: String )
+-- | someRecord = Option.recordFromRecord { foo: false, bar: 3 }
+-- |
+-- | anotherRecord :: Record ( foo :: Boolean, bar :: Int )
+-- | anotherRecord = Option.required someRecord
+-- | ```
+required ::
+  forall required optional.
+  Record required optional ->
+  Prim.Record required
+required record' = case record' of
+  Record record -> record.required
 
 -- | Changes a key with the given value to an option.
 -- | The key must already exist in the option.
@@ -2335,12 +2961,22 @@ set proxy value option = (alter' go proxy option).option
 -- | anotherOption = Option.set' { bar: 31 } someOption
 -- | ```
 set' ::
-  forall option option' record.
-  Set record option' option =>
-  Record record ->
-  Option option' ->
-  Option option
-set' = set''
+  forall optional optional' record.
+  Set record () optional' () optional =>
+  Prim.Record record ->
+  Option optional' ->
+  Option optional
+set' record'' option = optional record
+  where
+  record' :: Record () optional'
+  record' =
+    recordFromRecordAndOption
+      { optional: option
+      , required: {}
+      }
+
+  record :: Record () optional
+  record = set'' record'' record'
 
 -- | The expected `Record record` will have the same fields as the given `Option _` where each type is wrapped in a `Maybe`.
 -- |
@@ -2352,14 +2988,19 @@ set' = set''
 -- | someRecord :: Record ( foo :: Data.Maybe.Maybe Boolean, bar :: Data.Maybe.Maybe Int )
 -- | someRecord = Option.toRecord someOption
 -- | ```
--- |
--- | This is an alias for `toRecord'` so the documentation is a bit clearer.
 toRecord ::
-  forall option record.
-  ToRecord option record =>
-  Option option ->
-  Record record
-toRecord = toRecord'
+  forall optional record.
+  ToRecord () optional record =>
+  Option optional ->
+  Prim.Record record
+toRecord option = toRecord' record
+  where
+  record :: Record () optional
+  record =
+    recordFromRecordAndOption
+      { optional: option
+      , required: {}
+      }
 
 -- Sanity checks
 -- These are in this module so things are always checked.
@@ -2429,13 +3070,13 @@ user16 = delete' {} user
 user17 :: Option ()
 user17 = delete' { age: unit, username: unit } user
 
-user18 :: Record ()
+user18 :: Prim.Record ()
 user18 = get' {} user
 
-user19 :: Record ( age :: Int, username :: String )
+user19 :: Prim.Record ( age :: Int, username :: String )
 user19 = get' { age: 0, username: "anonymous" } user
 
-user20 :: Record ( age :: String, username :: Data.Maybe.Maybe String )
+user20 :: Prim.Record ( age :: String, username :: Data.Maybe.Maybe String )
 user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just "anonymous" } user
 
 user21 :: Option ( age :: Boolean, username :: String )
@@ -2456,5 +3097,26 @@ user25 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Just "Pat" }
 user26 :: User
 user26 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Nothing }
 
-testing :: { optional :: Option ( title :: String ), required :: { name :: String } }
-testing = fromRecordWithRequired { title: "Mr.", name: "" }
+type Greeting
+  = Record ( name :: String ) ( title :: String )
+
+greeting1 :: Greeting
+greeting1 = recordFromRecord { name: "Pat" }
+
+greeting2 :: Greeting
+greeting2 = recordFromRecord { name: "Pat", title: "Dr." }
+
+greeting3 :: Greeting
+greeting3 = recordSet { name: "Chris" } greeting1
+
+greeting4 :: Greeting
+greeting4 = recordSet { title: "Dr." } greeting1
+
+greeting5 :: Greeting
+greeting5 = recordSet { name: "Chris", title: "Dr." } greeting1
+
+greeting6 :: Greeting
+greeting6 = recordSet { name: "Chris", title: Data.Maybe.Just "Dr." } greeting1
+
+greeting7 :: Greeting
+greeting7 = recordSet { name: "Chris", title: Data.Maybe.Nothing } greeting1
