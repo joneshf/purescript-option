@@ -1769,15 +1769,24 @@ else instance ordOptionCons ::
 -- | the type from the iterated `RowList` is used.
 class Partition (list :: Prim.RowList.RowList) (requiredInput :: Prim.RowList.RowList) (optionalInput :: Prim.RowList.RowList) (requiredOutput :: Prim.RowList.RowList) (optionalOutput :: Prim.RowList.RowList) | list optionalInput requiredInput -> optionalOutput requiredOutput
 
-instance partitionNilNilNil :: Partition Prim.RowList.Nil requiredInput optionalInput Prim.RowList.Nil Prim.RowList.Nil
-else instance partitionConsConsAny ::
+instance partitionNilAnyAnyNilNil ::
+  Partition Prim.RowList.Nil requiredInput optionalInput Prim.RowList.Nil Prim.RowList.Nil
+else instance partitionConsConsAnyConsAny ::
   ( Partition list requiredInput optionalInput requiredOutput optionalOutput
     ) =>
   Partition (Prim.RowList.Cons label requiredValue list) (Prim.RowList.Cons label value requiredInput) optionalInput (Prim.RowList.Cons label requiredValue requiredOutput) optionalOutput
-else instance partitionConsAnyCons ::
+else instance partitionConsAnyConsAnyCons ::
   ( Partition list requiredInput optionalInput requiredOutput optionalOutput
     ) =>
   Partition (Prim.RowList.Cons label optionalValue list) requiredInput (Prim.RowList.Cons label value optionalInput) requiredOutput (Prim.RowList.Cons label optionalValue optionalOutput)
+else instance partitionConsConsAnyAnyAny ::
+  ( Partition (Prim.RowList.Cons label value list) requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label value list) (Prim.RowList.Cons requiredLabel requiredValue requiredInput) optionalInput requiredOutput optionalOutput
+else instance partitionConsAnyConsAnyAny ::
+  ( Partition (Prim.RowList.Cons label value list) requiredInput optionalInput requiredOutput optionalOutput
+    ) =>
+  Partition (Prim.RowList.Cons label value list) requiredInput (Prim.RowList.Cons optionalLabel optionalValue optionalInput) requiredOutput optionalOutput
 
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
 class ReadForeignOption (list :: Prim.RowList.RowList) (option :: # Type) | list -> option where
