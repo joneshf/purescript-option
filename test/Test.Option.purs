@@ -227,6 +227,22 @@ spec_recordSet =
         anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
         anotherRecord = Option.recordSet { bar: 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+    Test.Spec.it "can set any required and optional values" do
+      let
+        someRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz :: String ) ( qux :: Boolean, cor :: Int, gar :: String )
+        someRecord = Option.recordFromRecord { foo: false, bar: 31, baz: "hi" }
+
+        anotherRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz :: String ) ( qux :: Boolean, cor :: Int, gar :: String )
+        anotherRecord = Option.recordSet { baz: "hello", qux: true } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: 31, baz: "hello", cor: Data.Maybe.Nothing, foo: false, gar: Data.Maybe.Nothing, qux: Data.Maybe.Just true }
+    Test.Spec.it "can set any required and optional values with any interleaving of names" do
+      let
+        someRecord :: Option.Record ( a :: Boolean, c :: Boolean, e :: Boolean ) ( b :: Boolean, d :: Boolean, f :: Boolean )
+        someRecord = Option.recordFromRecord { a: false, c: false, e: false }
+
+        anotherRecord :: Option.Record ( a :: Boolean, c :: Boolean, e :: Boolean ) ( b :: Boolean, d :: Boolean, f :: Boolean )
+        anotherRecord = Option.recordSet { b: true, c: true, d: true } someRecord
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { a: false, b: Data.Maybe.Just true, c: true, d: Data.Maybe.Just true, e: false, f: Data.Maybe.Nothing }
     Test.Spec.it "can change the type of both required and optional values" do
       let
         someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Boolean )
@@ -278,6 +294,14 @@ spec_set' =
         anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
         anotherOption = Option.set' { bar: 31 } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
+    Test.Spec.it "can work for any field" do
+      let
+        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption = Option.empty
+
+        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        anotherOption = Option.set' { qux: "hi" } someOption
+      Option.get (Proxy :: _ "qux") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just "hi"
     Test.Spec.it "can change the type" do
       let
         someOption :: Option.Option ( foo :: Boolean, bar :: Boolean )
