@@ -44,8 +44,10 @@ module Option
   , modify'
   , optional
   , recordFromRecord
+  , recordRename
   , recordSet
   , recordToRecord
+  , rename
   , required
   , set
   , set'
@@ -97,6 +99,12 @@ module Option
   , class Partition
   , class ReadForeignOption
   , readImplOption
+  , class Rename
+  , rename'
+  , class RenameOptional
+  , renameOptional
+  , class RenameRequired
+  , renameRequired
   , class Set
   , set''
   , class SetOption
@@ -1842,6 +1850,160 @@ else instance readForeignOptionCons ::
     proxy :: Proxy list
     proxy = Proxy
 
+-- | A typeclass that renames fields in an `Option.Record _ _`.
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+-- | someRecord = Option.recordFromRecord { foo: true }
+-- |
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar2 :: Int )
+-- | anotherRecord = Option.rename' { bar: Data.Symbol.SProxy :: _ "bar2" } someRecord
+-- | ```
+class Rename (record :: # Type) (requiredInput :: # Type) (optionalInput :: # Type) (requiredOutput :: # Type) (optionalOutput :: # Type) where
+  rename' ::
+    Prim.Record record ->
+    Record requiredInput optionalInput ->
+    Record requiredOutput optionalOutput
+
+-- | This instance renames all fields in an `Option.Record _ _`.
+instance renameAny ::
+  ( Partition recordList requiredList' optionalList' requiredList optionalList
+  , Prim.RowList.RowToList optional' optionalList'
+  , Prim.RowList.RowToList record recordList
+  , Prim.RowList.RowToList required' requiredList'
+  , RenameOptional optionalList record optional' optional
+  , RenameRequired requiredList record required' required
+  ) =>
+  Rename record required' optional' required optional where
+  rename' ::
+    Prim.Record record ->
+    Record required' optional' ->
+    Record required optional
+  rename' record' record =
+    recordFromRecordAndOption
+      { optional: renameOptional optionalList record' (optional record)
+      , required: renameRequired requiredList record' (required record)
+      }
+    where
+    optionalList :: Proxy optionalList
+    optionalList = Proxy
+
+    requiredList :: Proxy requiredList
+    requiredList = Proxy
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` renaming fields in an `Option _`.
+class RenameOptional (list :: Prim.RowList.RowList) (record :: # Type) (optional' :: # Type) (optional :: # Type) | list optional' -> optional, optional' record -> optional where
+  renameOptional ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Option optional' ->
+    Option optional
+
+instance renameOptionalNil ::
+  RenameOptional Prim.RowList.Nil record optional optional where
+  renameOptional ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Option optional ->
+    Option optional
+  renameOptional _ _ option = option
+else instance renameOptionalCons ::
+  ( Data.Symbol.IsSymbol oldLabel
+  , Data.Symbol.IsSymbol newLabel
+  , Prim.Row.Cons oldLabel (proxyLabel newLabel) record' record
+  , Prim.Row.Cons newLabel value newOptional' newOptional
+  , Prim.Row.Cons oldLabel value oldOptional' oldOptional
+  , Prim.Row.Lacks oldLabel oldOptional'
+  , Prim.Row.Lacks newLabel newOptional'
+  , RenameOptional list record oldOptional' newOptional'
+  ) =>
+  RenameOptional (Prim.RowList.Cons oldLabel (proxyLabel newLabel) list) record oldOptional newOptional where
+  renameOptional ::
+    forall proxy.
+    proxy (Prim.RowList.Cons oldLabel (proxyLabel newLabel) list) ->
+    Prim.Record record ->
+    Option oldOptional ->
+    Option newOptional
+  renameOptional _ record oldOptional = case value' of
+    Data.Maybe.Just value -> insert newLabel value newOptional
+    Data.Maybe.Nothing -> insertField newLabel newOptional
+    where
+    newLabel :: Data.Symbol.SProxy newLabel
+    newLabel = Data.Symbol.SProxy
+
+    newOptional :: Option newOptional'
+    newOptional = renameOptional proxy record oldOptional'
+
+    oldLabel :: Data.Symbol.SProxy oldLabel
+    oldLabel = Data.Symbol.SProxy
+
+    oldOptional' :: Option oldOptional'
+    oldOptional' = delete oldLabel oldOptional
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    value' :: Data.Maybe.Maybe value
+    value' = get oldLabel oldOptional
+
+-- | A typeclass that iterates a `Prim.RowList.RowList` renaming fields in a `Record _`.
+class RenameRequired (list :: Prim.RowList.RowList) (record :: # Type) (required' :: # Type) (required :: # Type) | list required' -> required, required' record -> required where
+  renameRequired ::
+    forall proxy.
+    proxy list ->
+    Prim.Record record ->
+    Prim.Record required' ->
+    Prim.Record required
+
+instance renameRequiredNil ::
+  RenameRequired Prim.RowList.Nil record required required where
+  renameRequired ::
+    forall proxy.
+    proxy Prim.RowList.Nil ->
+    Prim.Record record ->
+    Prim.Record required ->
+    Prim.Record required
+  renameRequired _ _ record = record
+else instance renameRequiredCons ::
+  ( Data.Symbol.IsSymbol oldLabel
+  , Data.Symbol.IsSymbol newLabel
+  , Prim.Row.Cons oldLabel (proxyLabel newLabel) record' record
+  , Prim.Row.Cons newLabel value newRequired' newRequired
+  , Prim.Row.Cons oldLabel value oldRequired' oldRequired
+  , Prim.Row.Lacks oldLabel oldRequired'
+  , Prim.Row.Lacks newLabel newRequired'
+  , RenameRequired list record oldRequired' newRequired'
+  ) =>
+  RenameRequired (Prim.RowList.Cons oldLabel (proxyLabel newLabel) list) record oldRequired newRequired where
+  renameRequired ::
+    forall proxy.
+    proxy (Prim.RowList.Cons oldLabel (proxyLabel newLabel) list) ->
+    Prim.Record record ->
+    Prim.Record oldRequired ->
+    Prim.Record newRequired
+  renameRequired _ record oldRequired = Record.insert newLabel value newRequired
+    where
+    newLabel :: Data.Symbol.SProxy newLabel
+    newLabel = Data.Symbol.SProxy
+
+    newRequired :: Prim.Record newRequired'
+    newRequired = renameRequired proxy record oldRequired'
+
+    oldLabel :: Data.Symbol.SProxy oldLabel
+    oldLabel = Data.Symbol.SProxy
+
+    oldRequired' :: Prim.Record oldRequired'
+    oldRequired' = Record.delete oldLabel oldRequired
+
+    proxy :: Proxy list
+    proxy = Proxy
+
+    value :: value
+    value = Record.get oldLabel oldRequired
+
 -- | A typeclass that sets values in an `Option.Record _ _`.
 -- |
 -- | The keys must already exist in the `Option.Record _ _`.
@@ -2792,6 +2954,24 @@ recordFromRecordAndOption record =
     , required: record.required
     }
 
+-- | Renames all of the fields from the given `Option.Record _ _`
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int, qux :: String )
+-- | someRecord = Option.recordFromRecord { foo: false }
+-- |
+-- | anotherRecord :: Option.Record ( foo :: Boolean ) ( bar2 :: Int, qux :: String )
+-- | anotherRecord = Option.recordRename { bar: Data.Symbol.SProxy :: _ "bar2" } someRecord
+-- | ```
+recordRename ::
+  forall optional optional' record required required'.
+  Rename record required' optional' required optional =>
+  Prim.Record record ->
+  Record required' optional' ->
+  Record required optional
+recordRename = rename'
+
 -- | Sets the given key/values in an `Option.Record _ _`.
 -- | The key must already exist in the `Option.Record _ _`.
 -- | If the key might not already exist in the `Option.Record _ _`, `recordInsert` should be used instead.
@@ -2831,6 +3011,34 @@ recordToRecord ::
   Record required optional ->
   Prim.Record record
 recordToRecord record = toRecord' record
+
+-- | Renames all of the fields from the given `Option.Option _`
+-- |
+-- | E.g.
+-- | ```PureScript
+-- | someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+-- | someOption = Option.empty
+-- |
+-- | anotherOption :: Option.Option ( foo :: Boolean, bar2 :: Int, qux :: String )
+-- | anotherOption = Option.rename { bar: Data.Symbol.SProxy :: _ "bar2" } someOption
+-- | ```
+rename ::
+  forall optional optional' record.
+  Rename record () optional' () optional =>
+  Prim.Record record ->
+  Option optional' ->
+  Option optional
+rename record'' option = optional record
+  where
+  record' :: Record () optional'
+  record' =
+    recordFromRecordAndOption
+      { optional: option
+      , required: {}
+      }
+
+  record :: Record () optional
+  record = rename' record'' record'
 
 -- | Retrieves all of the required fields from the given `Option.Record _ _`.
 -- |
@@ -3028,6 +3236,12 @@ user25 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Just "Pat" }
 user26 :: User
 user26 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Nothing }
 
+user27 :: Option ( age1 :: Int, username :: String )
+user27 = rename { age: Data.Symbol.SProxy :: Data.Symbol.SProxy "age1" } user
+
+user28 :: Option ( age :: Int, username2 :: String )
+user28 = rename { username: Data.Symbol.SProxy :: Data.Symbol.SProxy "username2" } user
+
 type Greeting
   = Record ( name :: String ) ( title :: String )
 
@@ -3051,3 +3265,6 @@ greeting6 = recordSet { name: "Chris", title: Data.Maybe.Just "Dr." } greeting1
 
 greeting7 :: Greeting
 greeting7 = recordSet { name: "Chris", title: Data.Maybe.Nothing } greeting1
+
+greeting8 :: Record ( "Name" :: String ) ( "Title" :: String )
+greeting8 = recordRename { name: Data.Symbol.SProxy :: Data.Symbol.SProxy "Name", title: Data.Symbol.SProxy :: Data.Symbol.SProxy "Title" } greeting1
