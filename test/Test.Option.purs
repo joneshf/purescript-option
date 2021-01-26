@@ -249,14 +249,14 @@ spec_recordSet =
         anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
         anotherRecord = Option.recordSet { bar: Data.Maybe.Just 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
-    Test.Spec.it "`Data.Maybe.Nothing` keeps the previous value" do
+    Test.Spec.it "`Data.Maybe.Nothing` removes the previous value" do
       let
         someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
         someRecord = Option.recordFromRecord { bar: 31, foo: false }
 
         anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
         anotherRecord = Option.recordSet { bar: Data.Maybe.Nothing } someRecord
-      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
+      Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Nothing, foo: false }
     Test.Spec.it "can set both required and optional values" do
       let
         someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
@@ -376,11 +376,11 @@ spec_set' =
         anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
         anotherOption = Option.set' { bar: Data.Maybe.Just 31 } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
-    Test.Spec.it "`Data.Maybe.Nothing` keeps the previous value" do
+    Test.Spec.it "`Data.Maybe.Nothing` removes the previous value" do
       let
         someOption :: Option.Option ( foo :: Boolean, bar :: Int )
         someOption = Option.fromRecord { bar: 31 }
 
         anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
         anotherOption = Option.set' { bar: Data.Maybe.Nothing } someOption
-      Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
+      Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Nothing

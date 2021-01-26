@@ -2086,9 +2086,7 @@ else instance setOptionConsMaybe ::
     Option option
   setOption _ record oldOption = case value' of
     Data.Maybe.Just value -> insert label value option
-    Data.Maybe.Nothing -> case get label oldOption of
-      Data.Maybe.Just value -> insert label value option
-      Data.Maybe.Nothing -> insertField label option
+    Data.Maybe.Nothing -> insertField label option
     where
     label :: Data.Symbol.SProxy label
     label = Data.Symbol.SProxy
