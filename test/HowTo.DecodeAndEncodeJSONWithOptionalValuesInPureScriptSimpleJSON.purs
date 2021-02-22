@@ -58,6 +58,27 @@ spec_readJSON =
       Test.Spec.Assertions.shouldEqual
         (readJSON json)
         (Data.Either.Right (Option.fromRecord { name: "Pat", title: "Dr." }))
+    Test.Spec.it "doesn't fail a null name" do
+      let
+        json :: String
+        json = """{ "name": null }"""
+      Test.Spec.Assertions.shouldEqual
+        (readJSON json)
+        (Data.Either.Right (Option.fromRecord {}))
+    Test.Spec.it "doesn't fail for a null title" do
+      let
+        json :: String
+        json = """{ "title": null }"""
+      Test.Spec.Assertions.shouldEqual
+        (readJSON json)
+        (Data.Either.Right (Option.fromRecord {}))
+    Test.Spec.it "doesn't fail for a null name or title" do
+      let
+        json :: String
+        json = """{ "name": null, "title": null }"""
+      Test.Spec.Assertions.shouldEqual
+        (readJSON json)
+        (Data.Either.Right (Option.fromRecord {}))
 
 spec_writeJSON :: Test.Spec.Spec Unit
 spec_writeJSON =

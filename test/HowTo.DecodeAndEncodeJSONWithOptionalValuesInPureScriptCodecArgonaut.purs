@@ -85,3 +85,15 @@ spec_parse =
       Test.Spec.Assertions.shouldEqual
         (parse """{ "name": "Pat", "title": "Dr." }""")
         (Data.Either.Right (Option.fromRecord { name: "Pat", title: "Dr." }))
+    Test.Spec.it "doesn't fail a null name" do
+      Test.Spec.Assertions.shouldEqual
+        (parse """{ "name": null }""")
+        (Data.Either.Right (Option.fromRecord {}))
+    Test.Spec.it "doesn't fail for a null title" do
+      Test.Spec.Assertions.shouldEqual
+        (parse """{ "title": null }""")
+        (Data.Either.Right (Option.fromRecord {}))
+    Test.Spec.it "doesn't fail for a null name or title" do
+      Test.Spec.Assertions.shouldEqual
+        (parse """{ "name": null, "title": null }""")
+        (Data.Either.Right (Option.fromRecord {}))
