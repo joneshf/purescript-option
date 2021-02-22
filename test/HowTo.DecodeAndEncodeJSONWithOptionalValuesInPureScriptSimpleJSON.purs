@@ -23,7 +23,7 @@ writeJSON = Simple.JSON.writeJSON
 
 spec :: Test.Spec.Spec Unit
 spec =
-  Test.Spec.describe "HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptArgonaut" do
+  Test.Spec.describe "HowTo.DecodeAndEncodeJSONWithOptionalValuesInPureScriptSimpleJSON" do
     spec_readJSON
     spec_writeJSON
 
