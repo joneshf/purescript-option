@@ -133,6 +133,7 @@ import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
 import Data.Argonaut.Encode.Class as Data.Argonaut.Encode.Class
 import Data.Codec as Data.Codec
 import Data.Codec.Argonaut as Data.Codec.Argonaut
+import Data.Codec.Argonaut.Compat as Data.Codec.Argonaut.Compat
 import Data.Either as Data.Either
 import Data.List as Data.List
 import Data.Maybe as Data.Maybe
@@ -605,9 +606,11 @@ else instance decodeJsonOptionCons ::
     Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option option)
   decodeJsonOption _ object' = case Foreign.Object.lookup key object' of
     Data.Maybe.Just json -> do
-      value <- Data.Argonaut.Decode.Class.decodeJson json
+      value' <- Data.Argonaut.Decode.Class.decodeJson json
       option <- option'
-      Data.Either.Right (insert label value option)
+      case value' of
+        Data.Maybe.Just value -> Data.Either.Right (insert label value option)
+        Data.Maybe.Nothing -> Data.Either.Right (insertField label option)
     Data.Maybe.Nothing -> do
       option <- option'
       Data.Either.Right (insertField label option)
@@ -1509,9 +1512,11 @@ else instance jsonCodecOptionCons ::
     decode object' = do
       option <- Data.Codec.Argonaut.decode option' object'
       case Foreign.Object.lookup key object' of
-        Data.Maybe.Just json -> case Data.Codec.Argonaut.decode codec json of
+        Data.Maybe.Just json -> case Data.Codec.Argonaut.decode (Data.Codec.Argonaut.Compat.maybe codec) json of
           Data.Either.Left error -> Data.Either.Left (Data.Codec.Argonaut.AtKey key error)
-          Data.Either.Right value -> Data.Either.Right (insert label value option)
+          Data.Either.Right value' -> case value' of
+            Data.Maybe.Just value -> Data.Either.Right (insert label value option)
+            Data.Maybe.Nothing -> Data.Either.Right (insertField label option)
         Data.Maybe.Nothing -> Data.Either.Right (insertField label option)
 
     encode ::
@@ -1833,9 +1838,11 @@ else instance readForeignOptionCons ::
       true ->
         Control.Monad.Except.except case Control.Monad.Except.runExcept (Foreign.Index.readProp key foreign') of
           Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
-          Data.Either.Right value' -> case Control.Monad.Except.runExcept (Simple.JSON.readImpl value') of
+          Data.Either.Right value'' -> case Control.Monad.Except.runExcept (Simple.JSON.readImpl value'') of
             Data.Either.Left errors -> Data.Either.Left (map (Foreign.Index.errorAt key) errors)
-            Data.Either.Right value -> Data.Either.Right (insert label value option)
+            Data.Either.Right value' -> case value' of
+              Data.Maybe.Just value -> Data.Either.Right (insert label value option)
+              Data.Maybe.Nothing -> Data.Either.Right (insertField label option)
       false -> pure (insertField label option)
     where
     key :: String

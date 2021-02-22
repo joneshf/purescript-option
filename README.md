@@ -330,6 +330,15 @@ We can give that a spin with some different JSON values:
 
 > parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.fromRecord { name: "Pat", title: "Dr." }))
+
+> parse """{ "name": null }"""
+Right (Option.fromRecord {})
+
+> parse """{ "title": null }"""
+Right (Option.fromRecord {})
+
+> parse """{ "name": null, "title": null }"""
+Right (Option.fromRecord {})
 ```
 
 We can also produce some different JSON values:
@@ -531,6 +540,15 @@ We can give that a spin with some different JSON values:
 
 > parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.fromRecord { name: "Pat", title: "Dr." }))
+
+> parse """{ "name": null }"""
+Right (Option.fromRecord {})
+
+> parse """{ "title": null }"""
+Right (Option.fromRecord {})
+
+> parse """{ "name": null, "title": null }"""
+Right (Option.fromRecord {})
 ```
 
 We can also produce some different JSON values:
@@ -828,6 +846,15 @@ We can give that a spin with some different JSON values:
 
 > readJSON """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.fromRecord { name: "Pat", title: "Dr." }))
+
+> readJSON """{ "name": null }"""
+Right (Option.fromRecord {})
+
+> readJSON """{ "title": null }"""
+Right (Option.fromRecord {})
+
+> readJSON """{ "name": null, "title": null }"""
+Right (Option.fromRecord {})
 ```
 
 We can also produce some different JSON values:
@@ -947,6 +974,9 @@ We can give that a spin with some different JSON values:
 
 > parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+
+> parse """{ "name": "Pat", "title": null }"""
+Right (Option.recordFromRecord { name: "Pat" })
 ```
 
 We can also produce some different JSON values:
@@ -1162,6 +1192,9 @@ We can give that a spin with some different JSON values:
 
 > parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+
+> parse """{ "name": "Pat", "title": null }"""
+Right (Option.recordFromRecord { name: "Pat" })
 ```
 
 Notice that we have to supply a `"name"` field in the JSON input otherwise it will not parse.
@@ -1474,6 +1507,9 @@ We can give that a spin with some different JSON values:
 
 > parse """{"name": "Pat", "title": "Dr."}"""
 (Right (Option.recordFromRecord { name: "Pat", title: "Dr." }))
+
+> parse """{ "name": "Pat", "title": null }"""
+Right (Option.recordFromRecord { name: "Pat" })
 ```
 
 We can also produce some different JSON values:
