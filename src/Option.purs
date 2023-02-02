@@ -125,9 +125,6 @@ module Option
 import Prelude
 import Prim hiding (Record)
 import Control.Monad.Except as Control.Monad.Except
-import Control.Monad.Reader.Trans as Control.Monad.Reader.Trans
-import Control.Monad.Writer as Control.Monad.Writer
-import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Argonaut.Core as Data.Argonaut.Core
 import Data.Argonaut.Decode.Class as Data.Argonaut.Decode.Class
 import Data.Argonaut.Decode.Error as Data.Argonaut.Decode.Error
@@ -137,9 +134,9 @@ import Data.Codec.Argonaut as Data.Codec.Argonaut
 import Data.Codec.Argonaut.Compat as Data.Codec.Argonaut.Compat
 import Data.Either as Data.Either
 import Data.Identity as Data.Identity
+import Data.List ((:))
 import Data.List as Data.List
 import Data.Maybe as Data.Maybe
-import Data.Profunctor.Star as Data.Profunctor.Star
 import Data.Show as Data.Show
 import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
@@ -1420,9 +1417,7 @@ instance jsonCodecRecordRequiredOptional ::
     where
     codec :: Data.Codec.Argonaut.JPropCodec (Record required optional)
     codec =
-      Data.Codec.GCodec
-        (Control.Monad.Reader.Trans.ReaderT decode)
-        (Data.Profunctor.Star.Star encode)
+      Data.Codec.codec decode encode
 
     decode ::
       Foreign.Object.Object Data.Argonaut.Core.Json ->
@@ -1441,13 +1436,9 @@ instance jsonCodecRecordRequiredOptional ::
 
     encode ::
       Record required optional ->
-      Control.Monad.Writer.Writer
-        (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json))
-        (Record required optional)
-    encode record = do
-      Control.Monad.Writer.Class.tell (Data.Codec.encode requiredCodec (required record))
-      Control.Monad.Writer.Class.tell (Data.Codec.encode optionalCodec (optional record))
-      pure record
+      (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json))
+    encode record =
+      Data.List.concat (Data.Codec.encode requiredCodec (required record) : (Data.Codec.encode optionalCodec (optional record)) : Data.List.Nil)
 
     optionalCodec :: Data.Codec.Argonaut.JPropCodec (Option optional)
     optionalCodec = jsonCodecOption optionalProxy record'
@@ -1479,10 +1470,10 @@ instance jsonCodecOptionNil :: JsonCodecOption Prim.RowList.Nil record option wh
     Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ _ =
-    Data.Codec.mapCodec
-      (\_ -> Data.Either.Right empty)
-      (\_ -> {})
-      Data.Codec.Argonaut.record
+    Data.Codec.codec
+      ((\_ -> Data.Either.Right empty) <=< Data.Codec.Argonaut.decode Data.Codec.Argonaut.record)
+      (Data.Codec.Argonaut.encode Data.Codec.Argonaut.record <<< \_ -> {})
+
 else instance jsonCodecOptionCons ::
   ( Data.Symbol.IsSymbol label
   , JsonCodecOption list record option'
@@ -1497,9 +1488,7 @@ else instance jsonCodecOptionCons ::
     Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Option option)
   jsonCodecOption _ record =
-    Data.Codec.GCodec
-      (Control.Monad.Reader.Trans.ReaderT decode)
-      (Data.Profunctor.Star.Star encode)
+    Data.Codec.codec decode encode
     where
     codec :: Data.Codec.Argonaut.JsonCodec value
     codec = Record.get label record
@@ -1519,19 +1508,18 @@ else instance jsonCodecOptionCons ::
 
     encode ::
       Option option ->
-      Control.Monad.Writer.Writer (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)) (Option option)
-    encode option = do
-      case get label option of
-        Data.Maybe.Just value ->
-          Control.Monad.Writer.Class.tell
-            ( Data.List.Cons
-                (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codec value))
-                Data.List.Nil
-            )
-        Data.Maybe.Nothing -> pure unit
-      Control.Monad.Writer.Class.tell
-        (Data.Codec.Argonaut.encode option' (delete label option))
-      pure option
+      (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json))
+    encode option =
+      let a = case get label option of
+                Data.Maybe.Just value ->
+                    ( Data.List.Cons
+                        (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codec value))
+                        Data.List.Nil
+                    )
+                Data.Maybe.Nothing -> Data.List.Nil
+      in
+      Data.List.concat (a : (Data.Codec.Argonaut.encode option' (delete label option)) : Data.List.Nil)
+      -- pure option
 
     key :: String
     key = Data.Symbol.reflectSymbol label
@@ -1563,10 +1551,10 @@ instance jsonCodecRequiredNil :: JsonCodecRequired Prim.RowList.Nil record () wh
     Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Prim.Record ())
   jsonCodecRequired _ _ =
-    Data.Codec.mapCodec
-      (\_ -> Data.Either.Right {})
-      (\_ -> {})
-      Data.Codec.Argonaut.record
+    Data.Codec.codec
+      (Data.Codec.Argonaut.decode Data.Codec.Argonaut.record)
+      (Data.Codec.Argonaut.encode Data.Codec.Argonaut.record)
+
 else instance jsonCodecRequiredCons ::
   ( Data.Symbol.IsSymbol label
   , JsonCodecRequired list record required'
@@ -1581,9 +1569,7 @@ else instance jsonCodecRequiredCons ::
     Prim.Record record ->
     Data.Codec.Argonaut.JPropCodec (Prim.Record required)
   jsonCodecRequired _ record =
-    Data.Codec.GCodec
-      (Control.Monad.Reader.Trans.ReaderT decode)
-      (Data.Profunctor.Star.Star encode)
+    Data.Codec.codec decode encode
     where
     codec :: Data.Codec.Argonaut.JsonCodec value
     codec = Record.get label record
@@ -1600,17 +1586,12 @@ else instance jsonCodecRequiredCons ::
         Data.Maybe.Nothing -> Data.Either.Left (Data.Codec.Argonaut.AtKey key Data.Codec.Argonaut.MissingValue)
 
     encode ::
-      Prim.Record required ->
-      Control.Monad.Writer.Writer (Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)) (Prim.Record required)
+      Prim.Record required -> Data.List.List (Data.Tuple.Tuple String Data.Argonaut.Core.Json)
     encode required' = do
-      Control.Monad.Writer.Class.tell
-        ( Data.List.Cons
+      Data.List.concat ((Data.List.Cons
             (Data.Tuple.Tuple key (Data.Codec.Argonaut.encode codec (Record.get label required')))
             Data.List.Nil
-        )
-      Control.Monad.Writer.Class.tell
-        (Data.Codec.Argonaut.encode requiredCodec (Record.delete label required'))
-      pure required'
+      ) : (Data.Codec.Argonaut.encode requiredCodec (Record.delete label required')): Data.List.Nil)
 
     key :: String
     key = Data.Symbol.reflectSymbol label
@@ -2779,7 +2760,7 @@ jsonCodec ::
   String ->
   Prim.Record record ->
   Data.Codec.Argonaut.JsonCodec (Option optional)
-jsonCodec name record' = Data.Codec.basicCodec decode encode
+jsonCodec name record' = Data.Codec.codec' decode encode
   where
   codec :: Data.Codec.Argonaut.JsonCodec (Record () optional)
   codec = jsonCodec' name record'

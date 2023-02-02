@@ -5,6 +5,7 @@ module HowTo.ProvideAnEasierAPIForDateTime
   ) where
 
 import Prelude
+import Type.Proxy as Type
 import Data.Date as Data.Date
 import Data.Date.Component as Data.Date.Component
 import Data.DateTime as Data.DateTime
@@ -39,13 +40,13 @@ dateTime record = Data.DateTime.DateTime date time
   date = Data.Date.canonicalDate year month day
     where
     day :: Data.Date.Component.Day
-    day = get (Data.Symbol.SProxy :: _ "day")
+    day = get (Type.Proxy :: _ "day")
 
     month :: Data.Date.Component.Month
-    month = Option.getWithDefault bottom (Data.Symbol.SProxy :: _ "month") options
+    month = Option.getWithDefault bottom (Type.Proxy :: _ "month") options
 
     year :: Data.Date.Component.Year
-    year = get (Data.Symbol.SProxy :: _ "year")
+    year = get (Type.Proxy :: _ "year")
 
   get ::
     forall label proxy record' value.
@@ -65,16 +66,16 @@ dateTime record = Data.DateTime.DateTime date time
   time = Data.Time.Time hour minute second millisecond
     where
     hour :: Data.Time.Component.Hour
-    hour = get (Data.Symbol.SProxy :: _ "hour")
+    hour = get (Type.Proxy :: _ "hour")
 
     minute :: Data.Time.Component.Minute
-    minute = get (Data.Symbol.SProxy :: _ "minute")
+    minute = get (Type.Proxy  :: _ "minute")
 
     millisecond :: Data.Time.Component.Millisecond
-    millisecond = get (Data.Symbol.SProxy :: _ "millisecond")
+    millisecond = get (Type.Proxy  :: _ "millisecond")
 
     second :: Data.Time.Component.Second
-    second = get (Data.Symbol.SProxy :: _ "second")
+    second = get (Type.Proxy  :: _ "second")
 
 spec :: Test.Spec.Spec Unit
 spec =
