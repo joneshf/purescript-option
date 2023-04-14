@@ -2549,6 +2549,12 @@ empty = Option Foreign.Object.empty
 -- | option4 :: Option.Option ( foo :: Boolean, bar :: Int )
 -- | option4 = Option.fromRecord { qux: [] }
 -- | ```
+-- |
+-- | You can also use `Option.fromRecord` to go from a `Record _` of `Maybe _` values to an `Option _`, e.g.:
+-- | ```PureScript
+-- | option5 :: Option.Option ( foo :: Boolean, bar :: Int )
+-- | option5 = Option.fromRecord { foo: Nothing, bar: Maybe 31 }
+-- | ```
 fromRecord ::
   forall optional record.
   FromRecord record () optional =>
