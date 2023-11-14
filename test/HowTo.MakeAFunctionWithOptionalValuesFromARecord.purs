@@ -5,6 +5,7 @@ module HowTo.MakeAFunctionWithOptionalValuesFromARecord
   ) where
 
 import Prelude
+import Type.Proxy as Type
 import Data.Maybe as Data.Maybe
 import Data.Symbol as Data.Symbol
 import Option as Option
@@ -19,7 +20,7 @@ greeting ::
 greeting record = "Hello, " <> title' <> name'
   where
   name' :: String
-  name' = case Option.get (Data.Symbol.SProxy :: _ "name") option of
+  name' = case Option.get (Type.Proxy :: _ "name") option of
     Data.Maybe.Just name -> name
     Data.Maybe.Nothing -> "World"
 
@@ -27,7 +28,7 @@ greeting record = "Hello, " <> title' <> name'
   option = Option.fromRecord record
 
   title' :: String
-  title' = case Option.get (Data.Symbol.SProxy :: _ "title") option of
+  title' = case Option.get (Type.Proxy :: _ "title") option of
     Data.Maybe.Just title -> title <> " "
     Data.Maybe.Nothing -> ""
 
