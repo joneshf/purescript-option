@@ -2,12 +2,12 @@ BOWER := npx bower
 BOWER_FLAGS ?=
 COMPILE_FLAGS ?= --censor-lib
 DEPENDENCIES := 'bower_components/purescript-*/src/**/*.purs'
+NIX := nix
 NODE := node
 NPM := npm
 OUTPUT := output
 PSA := npx psa
 PURS := npx purs
-PURTY := npx purty
 REPL_FLAGS ?=
 SRC := src
 TEST := test
@@ -61,9 +61,12 @@ clean:
 	  output
 
 .PHONY: format
-format: node_modules
-	find $(SRC) -name '*.purs' -exec $(PURTY) --write {} \;
-	find $(TEST) -name '*.purs' -exec $(PURTY) --write {} \;
+format:
+	$(NIX) fmt
+
+.PHONE: lint
+lint:
+	$(NIX) flake check
 
 node_modules: package.json
 	$(NPM) install
@@ -74,7 +77,7 @@ repl: bower_components
 	$(PURS) repl $(REPL_FLAGS) $(DEPENDENCIES) $(SRCS)
 
 .PHONY: test
-test: $(OUTPUT)/test.js bower_components $(SRC_OUTPUTS) $(TEST_OUTPUTS)
+test: $(OUTPUT)/test.js bower_components $(SRC_OUTPUTS) $(TEST_OUTPUTS) lint
 	$(NODE) $<
 
 .PHONY: variables
