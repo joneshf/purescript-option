@@ -136,6 +136,25 @@
                   enable = true;
                 };
 
+                # Check markdown files for consistency.
+                markdownlint = {
+                  enable = true;
+
+                  settings = {
+                    configuration = {
+                      MD013 = {
+                        # We'd like to use something like `wrap:inner-sentence`:
+                        # https://cirosantilli.com/markdown-style-guide/#option-wrap-inner-sentence,
+                        # or something related to SemBr: https://sembr.org/.
+                        # But that's stymied in an issue: https://github.com/DavidAnson/markdownlint/issues/298.
+                        #
+                        # We set the line length to something large enough to not get hit by it regularly.
+                        line_length = 1000;
+                      };
+                    };
+                  };
+                };
+
                 # While `nil` is a language server,
                 # it also has come static analysis we want to check.
                 nil = {
