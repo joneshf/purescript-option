@@ -183,6 +183,11 @@
                 enable = true;
               };
 
+              # Format Markdown code consistently.
+              mdformat = {
+                enable = true;
+              };
+
               # Format Nix code consistently.
               nixfmt = {
                 enable = true;

@@ -4,19 +4,19 @@ A data type for optional values.
 
 ## Table of Contents
 
-* [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
-* [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
-* [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
-* [How To: Make a function with required and optional values](#how-to-make-a-function-with-required-and-optional-values)
-* [How To: Make a function with required and optional values from a record](#how-to-make-a-function-with-required-and-optional-values-from-a-record)
-* [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-simple-json)
-* [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
-* [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
+- [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
+- [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
+- [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
+- [How To: Make a function with required and optional values](#how-to-make-a-function-with-required-and-optional-values)
+- [How To: Make a function with required and optional values from a record](#how-to-make-a-function-with-required-and-optional-values-from-a-record)
+- [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-simple-json)
+- [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
+- [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
 ## Explanation: Motivation for `Option _`
 
