@@ -1169,7 +1169,7 @@ else instance getOptionConsValue ::
 -- | someRecord = Option.getAll' someOption
 -- | ```
 -- |
--- | This can also be roughtly thought of as a monomorphic `Data.Traversable.sequence`.
+-- | This can also be roughly thought of as a monomorphic `Data.Traversable.sequence`.
 class GetAll (option :: Row Type) (record :: Row Type) | option -> record where
   -- | Attempts to fetch all of the values from all of the keys of an option.
   -- |
@@ -1194,7 +1194,7 @@ class GetAll (option :: Row Type) (record :: Row Type) | option -> record where
     Option option ->
     Data.Maybe.Maybe (Prim.Record record)
 
--- | This instancce converts an `Option _` to a `Maybe (Record _)`.
+-- | This instance converts an `Option _` to a `Maybe (Record _)`.
 -- |
 -- | If every key exists in the option, the record of values is returned in `Just _`.
 -- |

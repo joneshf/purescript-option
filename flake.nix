@@ -141,6 +141,13 @@
                 nil = {
                   enable = true;
                 };
+
+                # Check that we're not making any simple typos in prose.
+                # This checks not just plain text files (like Markdown),
+                # but also comments in source code like this comment you're reading right now.
+                typos = {
+                  enable = true;
+                };
               };
             };
           };
