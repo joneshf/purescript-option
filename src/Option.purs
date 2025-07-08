@@ -152,16 +152,16 @@ import Prim.RowList as Prim.RowList
 import Record as Record
 import Record.Builder as Record.Builder
 import Simple.JSON as Simple.JSON
-import Type.Data.RowList as Type.Data.RowList
 import Unsafe.Coerce as Unsafe.Coerce
 
 -- | A collection of key/value pairs where any key and value may or may not exist.
 -- | E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
 newtype Option (row :: Row Type) = Option (Foreign.Object.Object (forall a. a))
 
--- A local proxy for `Prim.RowList.RowList` so as not to impose a hard requirement on `Type.Data.RowList.RLProxy` in the typeclasses we define.
--- `Type.Data.RowList.RLProxy` can still be used by callers, but it's not a requirement.
-data Proxy (list :: Prim.RowList.RowList Type) = Proxy
+-- A local proxy for `Prim.RowList.RowList` so as not to impose a hard requirement on `Type.Proxy.Proxy` in the typeclasses we define.
+-- `Type.Proxy.Proxy` can still be used by callers, but it's not a requirement.
+data Proxy :: forall kind. kind -> Type
+data Proxy list = Proxy
 
 -- | This instance ignores keys that do not exist in the given JSON object.
 -- |
@@ -357,14 +357,14 @@ instance encodeJsonRecordRequiredOptional ::
     optionalJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
     optionalJSON = encodeJsonOption optionalProxy (optional record)
 
-    optionalProxy :: Type.Data.RowList.RLProxy optionalList
-    optionalProxy = Type.Data.RowList.RLProxy
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
 
     requiredJSON :: Foreign.Object.Object Data.Argonaut.Core.Json
     requiredJSON = Data.Argonaut.Encode.Class.gEncodeJson (required record) requiredProxy
 
-    requiredProxy :: Type.Data.RowList.RLProxy requiredList
-    requiredProxy = Type.Data.RowList.RLProxy
+    requiredProxy :: Proxy requiredList
+    requiredProxy = Proxy
 
 -- | For required fields:
 -- |
@@ -435,14 +435,14 @@ instance showRecord ::
     optionalFields :: Data.List.List String
     optionalFields = showOption optionalProxy (optional record')
 
-    optionalProxy :: Type.Data.RowList.RLProxy optionalList
-    optionalProxy = Type.Data.RowList.RLProxy
+    optionalProxy :: Proxy optionalList
+    optionalProxy = Proxy
 
     requiredFields :: Array String
     requiredFields = Data.Show.showRecordFields requiredProxy (required record')
 
-    requiredProxy :: Type.Data.RowList.RLProxy requiredList
-    requiredProxy = Type.Data.RowList.RLProxy
+    requiredProxy :: Proxy requiredList
+    requiredProxy = Proxy
 
 -- | For required fields:
 -- |
@@ -552,8 +552,8 @@ else instance alterOptionCons ::
     Data.Maybe.Just value -> insert label value option
     Data.Maybe.Nothing -> insertField label option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     oldOption' :: Option oldOption'
     oldOption' = delete label oldOption
@@ -614,8 +614,8 @@ else instance decodeJsonOptionCons ::
       option <- option'
       Data.Either.Right (insertField label option)
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     key :: String
     key = Data.Symbol.reflectSymbol label
@@ -686,8 +686,8 @@ else instance deleteOptionCons ::
     Option option
   deleteOption _ record option' = deleteOption proxy record option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option :: Option oldOption'
     option = delete label option'
@@ -740,8 +740,8 @@ else instance encodeJsonOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     proxy :: Proxy list
     proxy = Proxy
@@ -784,8 +784,8 @@ else instance eqOptionCons ::
     Boolean
   eqOption _ left right = leftValue == rightValue && rest
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     leftValue :: Data.Maybe.Maybe value
     leftValue = get label left
@@ -918,8 +918,8 @@ else instance fromRecordOptionConsMaybe ::
     Data.Maybe.Just value -> insert label value option
     Data.Maybe.Nothing -> insertField label option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option :: Option option'
     option = fromRecordOption proxy record
@@ -944,8 +944,8 @@ else instance fromRecordOptionCons ::
     Option option
   fromRecordOption _ record = insert label value option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option :: Option option'
     option = fromRecordOption proxy record
@@ -992,8 +992,8 @@ else instance fromRecordRequiredCons ::
     first :: Record.Builder.Builder (Prim.Record required') (Prim.Record required)
     first = Record.Builder.insert label value
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     proxy :: Proxy list
     proxy = Proxy
@@ -1080,8 +1080,8 @@ else instance getOptionConsFunction ::
   GetOption (Prim.RowList.Cons label (Data.Maybe.Maybe value -> result) list) givenRecord option record where
   getOption _ record' option = Record.insert label value record
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     optionValue :: Data.Maybe.Maybe value
     optionValue = get label option
@@ -1112,8 +1112,8 @@ else instance getOptionConsMaybe ::
     Data.Maybe.Just _ -> Record.insert label optionValue record
     Data.Maybe.Nothing -> Record.insert label recordValue record
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     optionValue :: Data.Maybe.Maybe value
     optionValue = get label option
@@ -1139,8 +1139,8 @@ else instance getOptionConsValue ::
     Data.Maybe.Just value -> Record.insert label value record
     Data.Maybe.Nothing -> Record.insert label recordValue record
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     optionValue :: Data.Maybe.Maybe value
     optionValue = get label option
@@ -1231,8 +1231,8 @@ else instance getAllOptionCons ::
       Data.Maybe.Nothing -> Data.Maybe.Nothing
     Data.Maybe.Nothing -> Data.Maybe.Nothing
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     proxy :: Proxy list
     proxy = Proxy
@@ -1311,8 +1311,8 @@ else instance insertOptionConsMaybe ::
     Data.Maybe.Just value -> insert label value option
     Data.Maybe.Nothing -> insertField label option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option :: Option option'
     option = insertOption proxy record oldOption
@@ -1338,8 +1338,8 @@ else instance insertOptionConsValue ::
     Option option
   insertOption _ record oldOption = insert label value option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option :: Option option'
     option = insertOption proxy record oldOption
@@ -1456,8 +1456,8 @@ instance jsonCodecRecordRequiredOptional ::
     requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required)
     requiredCodec = jsonCodecRequired requiredProxy record'
 
-    requiredProxy :: Type.Data.RowList.RLProxy requiredList
-    requiredProxy = Type.Data.RowList.RLProxy
+    requiredProxy :: Proxy requiredList
+    requiredProxy = Proxy
 
 -- | A typeclass that iterates a `RowList` converting a record of `JsonCodec`s into a `JsonCodec` for an option.
 class JsonCodecOption (list :: Prim.RowList.RowList Type) (record :: Row Type) (option :: Row Type) | list -> option record where
@@ -1534,8 +1534,8 @@ else instance jsonCodecOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option' :: Data.Codec.Argonaut.JPropCodec (Option option')
     option' = jsonCodecOption proxy record
@@ -1613,8 +1613,8 @@ else instance jsonCodecRequiredCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     requiredCodec :: Data.Codec.Argonaut.JPropCodec (Prim.Record required')
     requiredCodec = jsonCodecRequired proxy record
@@ -1692,8 +1692,8 @@ else instance modifyOptionCons ::
     Data.Maybe.Just value -> insert label (recordValue value) option
     Data.Maybe.Nothing -> insertField label option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     oldOption' :: Option oldOption'
     oldOption' = delete label oldOption
@@ -1754,8 +1754,8 @@ else instance ordOptionCons ::
     GT -> GT
     LT -> LT
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     leftValue :: Data.Maybe.Maybe value
     leftValue = get label left
@@ -1858,8 +1858,8 @@ else instance readForeignOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     option' :: Foreign.F (Option option')
     option' = readImplOption proxy foreign'
@@ -1948,14 +1948,14 @@ else instance renameOptionalCons ::
     Data.Maybe.Just value -> insert newLabel value newOptional
     Data.Maybe.Nothing -> insertField newLabel newOptional
     where
-    newLabel :: Data.Symbol.SProxy newLabel
-    newLabel = Data.Symbol.SProxy
+    newLabel :: Proxy newLabel
+    newLabel = Proxy
 
     newOptional :: Option newOptional'
     newOptional = renameOptional proxy record oldOptional'
 
-    oldLabel :: Data.Symbol.SProxy oldLabel
-    oldLabel = Data.Symbol.SProxy
+    oldLabel :: Proxy oldLabel
+    oldLabel = Proxy
 
     oldOptional' :: Option oldOptional'
     oldOptional' = delete oldLabel oldOptional
@@ -2003,14 +2003,14 @@ else instance renameRequiredCons ::
     Prim.Record newRequired
   renameRequired _ record oldRequired = Record.insert newLabel value newRequired
     where
-    newLabel :: Data.Symbol.SProxy newLabel
-    newLabel = Data.Symbol.SProxy
+    newLabel :: Proxy newLabel
+    newLabel = Proxy
 
     newRequired :: Prim.Record newRequired'
     newRequired = renameRequired proxy record oldRequired'
 
-    oldLabel :: Data.Symbol.SProxy oldLabel
-    oldLabel = Data.Symbol.SProxy
+    oldLabel :: Proxy oldLabel
+    oldLabel = Proxy
 
     oldRequired' :: Prim.Record oldRequired'
     oldRequired' = Record.delete oldLabel oldRequired
@@ -2105,8 +2105,8 @@ else instance setOptionConsMaybe ::
     Data.Maybe.Just value -> insert label value option
     Data.Maybe.Nothing -> insertField label option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     oldOption' :: Option oldOption'
     oldOption' = delete label oldOption
@@ -2137,8 +2137,8 @@ else instance setOptionCons ::
     Option option
   setOption _ record oldOption = insert label value option
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     oldOption' :: Option oldOption'
     oldOption' = delete label oldOption
@@ -2188,8 +2188,8 @@ else instance setRequiredCons ::
     Prim.Record required
   setRequired _ record oldRequired = Record.insert label value newRequired
     where
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     oldRequired' :: Prim.Record oldRequired'
     oldRequired' = Record.delete label oldRequired
@@ -2241,8 +2241,8 @@ else instance showOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     proxy :: Proxy list
     proxy = Proxy
@@ -2353,8 +2353,8 @@ else instance toRecordOptionCons ::
     first :: Record.Builder.Builder (Prim.Record record') (Prim.Record record)
     first = Record.Builder.insert label value
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     proxy :: Proxy list
     proxy = Proxy
@@ -2408,8 +2408,8 @@ else instance writeForeignOptionCons ::
     key :: String
     key = Data.Symbol.reflectSymbol label
 
-    label :: Data.Symbol.SProxy label
-    label = Data.Symbol.SProxy
+    label :: Proxy label
+    label = Proxy
 
     object :: Foreign.Object.Object Foreign.Foreign
     object = Foreign.unsafeFromForeign foreign'
@@ -2459,7 +2459,7 @@ alter' f _ (Option object) = { option, value }
   go value' = to (f (from value'))
 
   key :: String
-  key = Data.Symbol.reflectSymbol (Data.Symbol.SProxy :: Data.Symbol.SProxy label)
+  key = Data.Symbol.reflectSymbol (Proxy :: _ label)
 
   option :: Option option
   option = Option (Foreign.Object.alter go key object)
@@ -3219,22 +3219,22 @@ user :: User
 user = empty
 
 age :: Data.Maybe.Maybe Int
-age = get (Data.Symbol.SProxy :: _ "age") user
+age = get (Proxy :: _ "age") user
 
 user1 :: User
-user1 = set (Data.Symbol.SProxy :: _ "age") 12 user
+user1 = set (Proxy :: _ "age") 12 user
 
 user2 :: Option (username :: String, age :: Int, height :: Int)
-user2 = insert (Data.Symbol.SProxy :: _ "height") 12 user
+user2 = insert (Proxy :: _ "height") 12 user
 
 user3 :: Option (username :: String, age :: Boolean)
-user3 = set (Data.Symbol.SProxy :: _ "age") true user
+user3 = set (Proxy :: _ "age") true user
 
 user4 :: Option (username :: String)
-user4 = delete (Data.Symbol.SProxy :: _ "age") user
+user4 = delete (Proxy :: _ "age") user
 
 user5 :: Option (username :: String, age :: Boolean)
-user5 = modify (Data.Symbol.SProxy :: _ "age") (\_ -> true) user
+user5 = modify (Proxy :: _ "age") (\_ -> true) user
 
 user6 :: User
 user6 = fromRecord {}
@@ -3300,10 +3300,10 @@ user26 :: User
 user26 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Nothing }
 
 user27 :: Option (age1 :: Int, username :: String)
-user27 = rename { age: Data.Symbol.SProxy :: Data.Symbol.SProxy "age1" } user
+user27 = rename { age: Proxy :: _ "age1" } user
 
 user28 :: Option (age :: Int, username2 :: String)
-user28 = rename { username: Data.Symbol.SProxy :: Data.Symbol.SProxy "username2" } user
+user28 = rename { username: Proxy :: _ "username2" } user
 
 type Greeting = Record (name :: String) (title :: String)
 
@@ -3329,4 +3329,4 @@ greeting7 :: Greeting
 greeting7 = recordSet { name: "Chris", title: Data.Maybe.Nothing } greeting1
 
 greeting8 :: Record ("Name" :: String) ("Title" :: String)
-greeting8 = recordRename { name: Data.Symbol.SProxy :: Data.Symbol.SProxy "Name", title: Data.Symbol.SProxy :: Data.Symbol.SProxy "Title" } greeting1
+greeting8 = recordRename { name: Proxy :: _ "Name", title: Proxy :: _ "Title" } greeting1
