@@ -1,6 +1,6 @@
 BOWER := npx bower
 BOWER_FLAGS ?=
-COMPILE_FLAGS ?=
+COMPILE_FLAGS ?= --censor-lib
 DEPENDENCIES := 'bower_components/purescript-*/src/**/*.purs'
 NODE := node
 NPM := npm
@@ -19,12 +19,12 @@ TEST_OUTPUTS := $(patsubst $(TEST).%.purs,$(OUTPUT)/%/index.js,$(subst /,.,$(TES
 
 define SRC_OUTPUT_RULE
 $(patsubst $(SRC).%.purs,$(OUTPUT)/%/index.js,$(subst /,.,$(1))): $(1) bower_components
-	$(PSA) compile $(COMPILE_FLAGS) $(DEPENDENCIES) $(SRCS)
+	$(PSA) $(COMPILE_FLAGS) $(DEPENDENCIES) $(SRCS)
 endef
 
 define TEST_OUTPUT_RULE
 $(patsubst $(TEST).%.purs,$(OUTPUT)/%/index.js,$(subst /,.,$(1))): $(1) $(SRC_OUTPUTS) bower_components
-	$(PSA) compile $(COMPILE_FLAGS) $(DEPENDENCIES) $(SRCS) $(TESTS)
+	$(PSA) $(COMPILE_FLAGS) $(DEPENDENCIES) $(SRCS) $(TESTS)
 endef
 
 $(foreach source, $(SRCS), $(eval $(call SRC_OUTPUT_RULE, $(source))))
