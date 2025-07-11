@@ -11,11 +11,11 @@ import Test.Spec as Test.Spec
 import Test.Spec.Assertions as Test.Spec.Assertions
 
 greeting ::
-  Option.Record ( name :: String ) ( title :: String ) ->
+  Option.Record (name :: String) (title :: String) ->
   String
 greeting record' = "Hello, " <> title' <> record.name
   where
-  record :: Record ( name :: String, title :: Data.Maybe.Maybe String )
+  record :: Record (name :: String, title :: Data.Maybe.Maybe String)
   record = Option.recordToRecord record'
 
   title' :: String

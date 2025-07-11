@@ -13,11 +13,11 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 readJSON ::
   String ->
-  Simple.JSON.E (Option.Option ( name :: String, title :: String ))
+  Simple.JSON.E (Option.Option (name :: String, title :: String))
 readJSON = Simple.JSON.readJSON
 
 writeJSON ::
-  Option.Option ( name :: String, title :: String ) ->
+  Option.Option (name :: String, title :: String) ->
   String
 writeJSON = Simple.JSON.writeJSON
 

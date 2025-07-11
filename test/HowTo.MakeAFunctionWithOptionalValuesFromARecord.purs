@@ -13,7 +13,7 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 greeting ::
   forall record.
-  Option.FromRecord record () ( name :: String, title :: String ) =>
+  Option.FromRecord record () (name :: String, title :: String) =>
   Record record ->
   String
 greeting record = "Hello, " <> title' <> name'
@@ -23,7 +23,7 @@ greeting record = "Hello, " <> title' <> name'
     Data.Maybe.Just name -> name
     Data.Maybe.Nothing -> "World"
 
-  option :: Option.Option ( name :: String, title :: String )
+  option :: Option.Option (name :: String, title :: String)
   option = Option.fromRecord record
 
   title' :: String

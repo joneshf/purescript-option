@@ -15,18 +15,18 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 parse ::
   String ->
-  Data.Either.Either String (Option.Record ( name :: String ) ( title :: String ))
+  Data.Either.Either String (Option.Record (name :: String) (title :: String))
 parse string = case readJSON string of
   Data.Either.Left errors -> Data.Either.Left (Data.Semigroup.Foldable.intercalateMap " " Foreign.renderForeignError errors)
   Data.Either.Right record -> Data.Either.Right record
 
 readJSON ::
   String ->
-  Simple.JSON.E (Option.Record ( name :: String ) ( title :: String ))
+  Simple.JSON.E (Option.Record (name :: String) (title :: String))
 readJSON = Simple.JSON.readJSON
 
 writeJSON ::
-  Option.Record ( name :: String ) ( title :: String ) ->
+  Option.Record (name :: String) (title :: String) ->
   String
 writeJSON = Simple.JSON.writeJSON
 

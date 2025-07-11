@@ -15,15 +15,15 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 decode ::
   Data.Argonaut.Core.Json ->
-  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option.Option ( name :: String, title :: String ))
+  Data.Either.Either Data.Codec.Argonaut.JsonDecodeError (Option.Option (name :: String, title :: String))
 decode = Data.Codec.Argonaut.decode jsonCodec
 
 encode ::
-  Option.Option ( name :: String, title :: String ) ->
+  Option.Option (name :: String, title :: String) ->
   Data.Argonaut.Core.Json
 encode = Data.Codec.Argonaut.encode jsonCodec
 
-jsonCodec :: Data.Codec.Argonaut.JsonCodec (Option.Option ( name :: String, title :: String ))
+jsonCodec :: Data.Codec.Argonaut.JsonCodec (Option.Option (name :: String, title :: String))
 jsonCodec =
   Option.jsonCodec
     "Greeting"
@@ -33,7 +33,7 @@ jsonCodec =
 
 parse ::
   String ->
-  Data.Either.Either String (Option.Option ( name :: String, title :: String ))
+  Data.Either.Either String (Option.Option (name :: String, title :: String))
 parse string = do
   json <- Data.Argonaut.Parser.jsonParser string
   case decode json of

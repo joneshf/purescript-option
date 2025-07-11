@@ -12,15 +12,15 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 greeting ::
   forall record.
-  Option.FromRecord record ( name :: String ) ( title :: String ) =>
+  Option.FromRecord record (name :: String) (title :: String) =>
   Record record ->
   String
 greeting record'' = "Hello, " <> title' <> record.name
   where
-  record :: Record ( name :: String, title :: Data.Maybe.Maybe String )
+  record :: Record (name :: String, title :: Data.Maybe.Maybe String)
   record = Option.recordToRecord record'
 
-  record' :: Option.Record ( name :: String ) ( title :: String )
+  record' :: Option.Record (name :: String) (title :: String)
   record' = Option.recordFromRecord record''
 
   title' :: String

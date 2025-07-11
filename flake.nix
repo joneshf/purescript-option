@@ -193,6 +193,13 @@
                 enable = true;
               };
 
+              # Format PureScript code consistently.
+              purs-tidy = {
+                enable = true;
+
+                includes = [ "*.purs" ];
+              };
+
               # Format Shell code consistently.
               shfmt = {
                 enable = true;
