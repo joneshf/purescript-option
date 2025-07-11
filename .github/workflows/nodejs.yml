@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@53bed0742eb3f0455187c7c7042d27f51b856f02
       - name: Use Node.js 10.x

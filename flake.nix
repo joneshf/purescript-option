@@ -116,6 +116,11 @@
               ];
 
               hooks = {
+                # Check `.github/workflows` code.
+                actionlint = {
+                  enable = true;
+                };
+
                 # Check Nix code for anything that is unused.
                 deadnix = {
                   enable = true;
