@@ -204,6 +204,11 @@
               shfmt = {
                 enable = true;
               };
+
+              # Format YAML code consistently.
+              yamlfmt = {
+                enable = true;
+              };
             };
 
             settings.global.excludes = [
