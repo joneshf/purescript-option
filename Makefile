@@ -2,6 +2,7 @@ BOWER := npx bower
 BOWER_FLAGS ?=
 COMPILE_FLAGS ?=
 DEPENDENCIES := 'bower_components/purescript-*/src/**/*.purs'
+ESBUILD := npx esbuild
 NODE := node
 NPM := npm
 OUTPUT := output
@@ -37,12 +38,9 @@ $(OUTPUT):
 	mkdir -p $@
 
 $(OUTPUT)/test.js: $(SRC_OUTPUTS) $(TEST_OUTPUTS) | $(OUTPUT)
-	$(PURS) bundle \
-	  --main Test.Main \
-	  --module Test.Main \
-	  --output $@ \
-	  output/*/index.js \
-	  output/*/foreign.js
+	$(ESBUILD) $(OUTPUT)/Test.Main/index.js \
+	  --bundle \
+	  --outfile="$@"
 
 bower_components: bower.json node_modules
 	$(BOWER) $(BOWER_FLAGS) install

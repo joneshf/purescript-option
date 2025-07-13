@@ -17,6 +17,7 @@ import Option as Option
 import Prim.Row as Prim.Row
 import Test.Spec as Test.Spec
 import Test.Spec.Assertions as Test.Spec.Assertions
+import Type.Proxy as Type.Proxy
 
 type Option
   = ( day :: Int
@@ -39,13 +40,13 @@ dateTime record = Data.DateTime.DateTime date time
   date = Data.Date.canonicalDate year month day
     where
     day :: Data.Date.Component.Day
-    day = get (Data.Symbol.SProxy :: _ "day")
+    day = get (Type.Proxy.Proxy :: _ "day")
 
     month :: Data.Date.Component.Month
-    month = Option.getWithDefault bottom (Data.Symbol.SProxy :: _ "month") options
+    month = Option.getWithDefault bottom (Type.Proxy.Proxy :: _ "month") options
 
     year :: Data.Date.Component.Year
-    year = get (Data.Symbol.SProxy :: _ "year")
+    year = get (Type.Proxy.Proxy :: _ "year")
 
   get ::
     forall label proxy record' value.
@@ -65,16 +66,16 @@ dateTime record = Data.DateTime.DateTime date time
   time = Data.Time.Time hour minute second millisecond
     where
     hour :: Data.Time.Component.Hour
-    hour = get (Data.Symbol.SProxy :: _ "hour")
+    hour = get (Type.Proxy.Proxy :: _ "hour")
 
     minute :: Data.Time.Component.Minute
-    minute = get (Data.Symbol.SProxy :: _ "minute")
+    minute = get (Type.Proxy.Proxy :: _ "minute")
 
     millisecond :: Data.Time.Component.Millisecond
-    millisecond = get (Data.Symbol.SProxy :: _ "millisecond")
+    millisecond = get (Type.Proxy.Proxy :: _ "millisecond")
 
     second :: Data.Time.Component.Second
-    second = get (Data.Symbol.SProxy :: _ "second")
+    second = get (Type.Proxy.Proxy :: _ "second")
 
 spec :: Test.Spec.Spec Unit
 spec =
