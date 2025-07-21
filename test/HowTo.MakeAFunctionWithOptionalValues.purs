@@ -11,7 +11,7 @@ import Option as Option
 import Test.Spec as Test.Spec
 import Test.Spec.Assertions as Test.Spec.Assertions
 
-greeting :: Option.Option ( name :: String, title :: String ) -> String
+greeting :: Option.Option (name :: String, title :: String) -> String
 greeting option = "Hello, " <> title' <> name'
   where
   name' :: String

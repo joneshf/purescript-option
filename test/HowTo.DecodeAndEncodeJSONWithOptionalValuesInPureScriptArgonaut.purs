@@ -17,17 +17,17 @@ import Test.Spec.Assertions as Test.Spec.Assertions
 
 decode ::
   Data.Argonaut.Core.Json ->
-  Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option.Option ( name :: String, title :: String ))
+  Data.Either.Either Data.Argonaut.Decode.Error.JsonDecodeError (Option.Option (name :: String, title :: String))
 decode = Data.Argonaut.Decode.Class.decodeJson
 
 encode ::
-  Option.Option ( name :: String, title :: String ) ->
+  Option.Option (name :: String, title :: String) ->
   Data.Argonaut.Core.Json
 encode = Data.Argonaut.Encode.Class.encodeJson
 
 parse ::
   String ->
-  Data.Either.Either String (Option.Option ( name :: String, title :: String ))
+  Data.Either.Either String (Option.Option (name :: String, title :: String))
 parse string = case Data.Argonaut.Parser.jsonParser string of
   Data.Either.Left error -> Data.Either.Left error
   Data.Either.Right json -> case decode json of

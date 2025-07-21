@@ -8,8 +8,7 @@ import Option as Option
 import Test.Spec as Test.Spec
 import Test.Spec.Assertions as Test.Spec.Assertions
 
-data Proxy (symbol :: Symbol)
-  = Proxy
+data Proxy (symbol :: Symbol) = Proxy
 
 spec :: Test.Spec.Spec Unit
 spec =
@@ -31,7 +30,7 @@ spec_alter =
   Test.Spec.describe "alter" do
     Test.Spec.it "does nothing if values are not set" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.empty
 
         bar ::
@@ -43,7 +42,7 @@ spec_alter =
       Option.alter { bar } someOption `Test.Spec.Assertions.shouldEqual` Option.fromRecord {}
     Test.Spec.it "manipulates all fields it can" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.fromRecord { bar: 31, qux: "hi" }
 
         bar ::
@@ -132,7 +131,7 @@ spec_get' =
   Test.Spec.describe "get'" do
     Test.Spec.it "gets all fields it can" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.empty
 
         bar ::
@@ -148,7 +147,7 @@ spec_modify' =
   Test.Spec.describe "modify'" do
     Test.Spec.it "does nothing if values are not set" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.empty
 
         bar ::
@@ -158,7 +157,7 @@ spec_modify' =
       Option.modify' { bar } someOption `Test.Spec.Assertions.shouldEqual` Option.fromRecord {}
     Test.Spec.it "manipulates all fields it can" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.fromRecord { bar: 31 }
 
         bar ::
@@ -191,34 +190,34 @@ spec_recordRename =
   Test.Spec.describe "recordRename" do
     Test.Spec.it "renames a value when it doesn't exist" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar2 :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar2 :: Int)
         anotherRecord = Option.recordRename { bar: Proxy :: Proxy "bar2" } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar2: Data.Maybe.Nothing, foo: false }
     Test.Spec.it "can rename both required and optional values" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo1 :: Boolean ) ( bar2 :: Int )
+        anotherRecord :: Option.Record (foo1 :: Boolean) (bar2 :: Int)
         anotherRecord = Option.recordRename { foo: Proxy :: Proxy "foo1", bar: Proxy :: Proxy "bar2" } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar2: Data.Maybe.Nothing, foo1: false }
     Test.Spec.it "can rename any required and optional values" do
       let
-        someRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz :: String ) ( qux :: Boolean, cor :: Int, gar :: String )
+        someRecord :: Option.Record (foo :: Boolean, bar :: Int, baz :: String) (qux :: Boolean, cor :: Int, gar :: String)
         someRecord = Option.recordFromRecord { foo: false, bar: 31, baz: "hi" }
 
-        anotherRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz3 :: String ) ( qux4 :: Boolean, cor :: Int, gar :: String )
+        anotherRecord :: Option.Record (foo :: Boolean, bar :: Int, baz3 :: String) (qux4 :: Boolean, cor :: Int, gar :: String)
         anotherRecord = Option.recordRename { baz: Proxy :: Proxy "baz3", qux: Proxy :: Proxy "qux4" } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: 31, baz3: "hi", cor: Data.Maybe.Nothing, foo: false, gar: Data.Maybe.Nothing, qux4: Data.Maybe.Nothing }
     Test.Spec.it "can rename any required and optional values with any interleaving of names" do
       let
-        someRecord :: Option.Record ( a :: Boolean, c :: Boolean, e :: Boolean ) ( b :: Boolean, d :: Boolean, f :: Boolean )
+        someRecord :: Option.Record (a :: Boolean, c :: Boolean, e :: Boolean) (b :: Boolean, d :: Boolean, f :: Boolean)
         someRecord = Option.recordFromRecord { a: false, c: false, e: false }
 
-        anotherRecord :: Option.Record ( a :: Boolean, c2 :: Boolean, e :: Boolean ) ( b4 :: Boolean, d5 :: Boolean, f :: Boolean )
+        anotherRecord :: Option.Record (a :: Boolean, c2 :: Boolean, e :: Boolean) (b4 :: Boolean, d5 :: Boolean, f :: Boolean)
         anotherRecord = Option.recordRename { b: Proxy :: Proxy "b4", c: Proxy :: Proxy "c2", d: Proxy :: Proxy "d5" } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { a: false, b4: Data.Maybe.Nothing, c2: false, d5: Data.Maybe.Nothing, e: false, f: Data.Maybe.Nothing }
 
@@ -227,66 +226,66 @@ spec_recordSet =
   Test.Spec.describe "recordSet" do
     Test.Spec.it "sets a value when it doesn't exist" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         anotherRecord = Option.recordSet { bar: 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
     Test.Spec.it "can change the type" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Boolean )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Boolean)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         anotherRecord = Option.recordSet { bar: 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
     Test.Spec.it "can use a `Data.Maybe.Maybe _`" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         anotherRecord = Option.recordSet { bar: Data.Maybe.Just 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
     Test.Spec.it "`Data.Maybe.Nothing` removes the previous value" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { bar: 31, foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         anotherRecord = Option.recordSet { bar: Data.Maybe.Nothing } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Nothing, foo: false }
     Test.Spec.it "can set both required and optional values" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Boolean ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Boolean) (bar :: Int)
         anotherRecord = Option.recordSet { bar: 31 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: false }
     Test.Spec.it "can set any required and optional values" do
       let
-        someRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz :: String ) ( qux :: Boolean, cor :: Int, gar :: String )
+        someRecord :: Option.Record (foo :: Boolean, bar :: Int, baz :: String) (qux :: Boolean, cor :: Int, gar :: String)
         someRecord = Option.recordFromRecord { foo: false, bar: 31, baz: "hi" }
 
-        anotherRecord :: Option.Record ( foo :: Boolean, bar :: Int, baz :: String ) ( qux :: Boolean, cor :: Int, gar :: String )
+        anotherRecord :: Option.Record (foo :: Boolean, bar :: Int, baz :: String) (qux :: Boolean, cor :: Int, gar :: String)
         anotherRecord = Option.recordSet { baz: "hello", qux: true } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: 31, baz: "hello", cor: Data.Maybe.Nothing, foo: false, gar: Data.Maybe.Nothing, qux: Data.Maybe.Just true }
     Test.Spec.it "can set any required and optional values with any interleaving of names" do
       let
-        someRecord :: Option.Record ( a :: Boolean, c :: Boolean, e :: Boolean ) ( b :: Boolean, d :: Boolean, f :: Boolean )
+        someRecord :: Option.Record (a :: Boolean, c :: Boolean, e :: Boolean) (b :: Boolean, d :: Boolean, f :: Boolean)
         someRecord = Option.recordFromRecord { a: false, c: false, e: false }
 
-        anotherRecord :: Option.Record ( a :: Boolean, c :: Boolean, e :: Boolean ) ( b :: Boolean, d :: Boolean, f :: Boolean )
+        anotherRecord :: Option.Record (a :: Boolean, c :: Boolean, e :: Boolean) (b :: Boolean, d :: Boolean, f :: Boolean)
         anotherRecord = Option.recordSet { b: true, c: true, d: true } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { a: false, b: Data.Maybe.Just true, c: true, d: Data.Maybe.Just true, e: false, f: Data.Maybe.Nothing }
     Test.Spec.it "can change the type of both required and optional values" do
       let
-        someRecord :: Option.Record ( foo :: Boolean ) ( bar :: Boolean )
+        someRecord :: Option.Record (foo :: Boolean) (bar :: Boolean)
         someRecord = Option.recordFromRecord { foo: false }
 
-        anotherRecord :: Option.Record ( foo :: Int ) ( bar :: Int )
+        anotherRecord :: Option.Record (foo :: Int) (bar :: Int)
         anotherRecord = Option.recordSet { bar: 31, foo: 43 } someRecord
       Option.recordToRecord anotherRecord `Test.Spec.Assertions.shouldEqual` { bar: Data.Maybe.Just 31, foo: 43 }
 
@@ -314,18 +313,18 @@ spec_rename =
   Test.Spec.describe "rename" do
     Test.Spec.it "renames a value when it doesn't exist" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar2 :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar2 :: Int)
         anotherOption = Option.rename { bar: Proxy :: Proxy "bar2" } someOption
       Option.get (Proxy :: _ "bar2") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Nothing
     Test.Spec.it "can rename any field" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int, qux3 :: String )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int, qux3 :: String)
         anotherOption = Option.rename { qux: Proxy :: Proxy "qux3" } someOption
       Option.get (Proxy :: _ "qux3") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Nothing
 
@@ -334,10 +333,10 @@ spec_set =
   Test.Spec.describe "set" do
     Test.Spec.it "sets a value when it doesn't exist" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int)
         anotherOption = Option.set (Proxy :: _ "bar") 31 someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
 
@@ -346,41 +345,41 @@ spec_set' =
   Test.Spec.describe "set'" do
     Test.Spec.it "sets a value when it doesn't exist" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int)
         anotherOption = Option.set' { bar: 31 } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
     Test.Spec.it "can work for any field" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int, qux :: String )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int, qux :: String)
         anotherOption = Option.set' { qux: "hi" } someOption
       Option.get (Proxy :: _ "qux") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just "hi"
     Test.Spec.it "can change the type" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Boolean )
+        someOption :: Option.Option (foo :: Boolean, bar :: Boolean)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int)
         anotherOption = Option.set' { bar: 31 } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
     Test.Spec.it "can use a `Data.Maybe.Maybe _`" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int)
         someOption = Option.empty
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int)
         anotherOption = Option.set' { bar: Data.Maybe.Just 31 } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Just 31
     Test.Spec.it "`Data.Maybe.Nothing` removes the previous value" do
       let
-        someOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        someOption :: Option.Option (foo :: Boolean, bar :: Int)
         someOption = Option.fromRecord { bar: 31 }
 
-        anotherOption :: Option.Option ( foo :: Boolean, bar :: Int )
+        anotherOption :: Option.Option (foo :: Boolean, bar :: Int)
         anotherOption = Option.set' { bar: Data.Maybe.Nothing } someOption
       Option.get (Proxy :: _ "bar") anotherOption `Test.Spec.Assertions.shouldEqual` Data.Maybe.Nothing

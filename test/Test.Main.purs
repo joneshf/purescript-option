@@ -19,8 +19,7 @@ import Test.Spec as Test.Spec
 import Test.Spec.Reporter.Console as Test.Spec.Reporter.Console
 import Test.Spec.Runner as Test.Spec.Runner
 
-data Proxy (symbol :: Symbol)
-  = Proxy
+data Proxy (symbol :: Symbol) = Proxy
 
 main :: Effect.Effect Unit
 main = Effect.Aff.launchAff_ (Test.Spec.Runner.runSpec reporters spec)

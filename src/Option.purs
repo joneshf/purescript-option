@@ -157,13 +157,11 @@ import Unsafe.Coerce as Unsafe.Coerce
 
 -- | A collection of key/value pairs where any key and value may or may not exist.
 -- | E.g. `Option (foo :: Boolean, bar :: Int)` means that either only `foo` exists with a value, only `bar` exists with a value, both `foo` and `bar` exist with values, or neither `foo` nor `bar` exist.
-newtype Option (row :: Row Type)
-  = Option (Foreign.Object.Object (forall a. a))
+newtype Option (row :: Row Type) = Option (Foreign.Object.Object (forall a. a))
 
 -- A local proxy for `Prim.RowList.RowList` so as not to impose a hard requirement on `Type.Data.RowList.RLProxy` in the typeclasses we define.
 -- `Type.Data.RowList.RLProxy` can still be used by callers, but it's not a requirement.
-data Proxy (list :: Prim.RowList.RowList Type)
-  = Proxy
+data Proxy (list :: Prim.RowList.RowList Type) = Proxy
 
 -- | This instance ignores keys that do not exist in the given JSON object.
 -- |
@@ -274,8 +272,7 @@ instance writeForeignOptionOption ::
 
 -- | A combination of both language-level records and options.
 -- | E.g. `Option.Record (foo :: Boolean) (bar :: Int)` means that `foo` exists with a value all of the time, and either `bar` exists with a value or `bar` doesn't exist with a value.
-newtype Record (required :: Row Type) (optional :: Row Type)
-  = Record
+newtype Record (required :: Row Type) (optional :: Row Type) = Record
   { required :: Prim.Record required
   , optional :: Option optional
   }
@@ -1169,7 +1166,7 @@ else instance getOptionConsValue ::
 -- | someRecord = Option.getAll' someOption
 -- | ```
 -- |
--- | This can also be roughtly thought of as a monomorphic `Data.Traversable.sequence`.
+-- | This can also be roughly thought of as a monomorphic `Data.Traversable.sequence`.
 class GetAll (option :: Row Type) (record :: Row Type) | option -> record where
   -- | Attempts to fetch all of the values from all of the keys of an option.
   -- |
@@ -1194,7 +1191,7 @@ class GetAll (option :: Row Type) (record :: Row Type) | option -> record where
     Option option ->
     Data.Maybe.Maybe (Prim.Record record)
 
--- | This instancce converts an `Option _` to a `Maybe (Record _)`.
+-- | This instance converts an `Option _` to a `Maybe (Record _)`.
 -- |
 -- | If every key exists in the option, the record of values is returned in `Just _`.
 -- |
@@ -1717,7 +1714,10 @@ else instance modifyOptionCons ::
 
 -- | A typeclass that iterates a `RowList` converting an `Option _` to a `Boolean`.
 class
-  (EqOption list option) <= OrdOption (list :: Prim.RowList.RowList Type) (option :: Row Type) | list -> option where
+  ( EqOption list option
+  ) <=
+  OrdOption (list :: Prim.RowList.RowList Type) (option :: Row Type)
+  | list -> option where
   -- | The `proxy` can be anything so long as its type variable has kind `Prim.RowList.RowList`.
   -- |
   -- | It will commonly be `Type.Data.RowList.RLProxy`, but doesn't have to be.
@@ -1782,19 +1782,19 @@ instance partitionNilAnyAnyNilNil ::
   Partition Prim.RowList.Nil requiredInput optionalInput Prim.RowList.Nil Prim.RowList.Nil
 else instance partitionConsConsAnyConsAny ::
   ( Partition list requiredInput optionalInput requiredOutput optionalOutput
-    ) =>
+  ) =>
   Partition (Prim.RowList.Cons label requiredValue list) (Prim.RowList.Cons label value requiredInput) optionalInput (Prim.RowList.Cons label requiredValue requiredOutput) optionalOutput
 else instance partitionConsAnyConsAnyCons ::
   ( Partition list requiredInput optionalInput requiredOutput optionalOutput
-    ) =>
+  ) =>
   Partition (Prim.RowList.Cons label optionalValue list) requiredInput (Prim.RowList.Cons label value optionalInput) requiredOutput (Prim.RowList.Cons label optionalValue optionalOutput)
 else instance partitionConsConsAnyAnyAny ::
   ( Partition (Prim.RowList.Cons label value list) requiredInput optionalInput requiredOutput optionalOutput
-    ) =>
+  ) =>
   Partition (Prim.RowList.Cons label value list) (Prim.RowList.Cons requiredLabel requiredValue requiredInput) optionalInput requiredOutput optionalOutput
 else instance partitionConsAnyConsAnyAny ::
   ( Partition (Prim.RowList.Cons label value list) requiredInput optionalInput requiredOutput optionalOutput
-    ) =>
+  ) =>
   Partition (Prim.RowList.Cons label value list) requiredInput (Prim.RowList.Cons optionalLabel optionalValue optionalInput) requiredOutput optionalOutput
 
 -- | A typeclass that iterates a `RowList` attempting to read a `Foreign` to an `Option _`.
@@ -3155,7 +3155,8 @@ toRecord option = toRecord' record
 
 staticCheck ::
   forall a.
-  a -> Unit
+  a ->
+  Unit
 staticCheck _ = unit
 
 -- | Static checks
@@ -3205,8 +3206,10 @@ staticChecks =
   , staticCheck user28
   ]
 
-type User
-  = Option ( username :: String, age :: Int )
+type User = Option
+  ( username :: String
+  , age :: Int
+  )
 
 -- does_not_type1 :: User
 -- does_not_type1 = fromRecord { height: 10 }
@@ -3221,16 +3224,16 @@ age = get (Data.Symbol.SProxy :: _ "age") user
 user1 :: User
 user1 = set (Data.Symbol.SProxy :: _ "age") 12 user
 
-user2 :: Option ( username :: String, age :: Int, height :: Int )
+user2 :: Option (username :: String, age :: Int, height :: Int)
 user2 = insert (Data.Symbol.SProxy :: _ "height") 12 user
 
-user3 :: Option ( username :: String, age :: Boolean )
+user3 :: Option (username :: String, age :: Boolean)
 user3 = set (Data.Symbol.SProxy :: _ "age") true user
 
-user4 :: Option ( username :: String )
+user4 :: Option (username :: String)
 user4 = delete (Data.Symbol.SProxy :: _ "age") user
 
-user5 :: Option ( username :: String, age :: Boolean )
+user5 :: Option (username :: String, age :: Boolean)
 user5 = modify (Data.Symbol.SProxy :: _ "age") (\_ -> true) user
 
 user6 :: User
@@ -3254,7 +3257,7 @@ user11 = set' { age: 31 } user
 user12 :: User
 user12 = set' { age: 31, username: "pat" } user
 
-user13 :: Option ( username :: String, age :: Boolean )
+user13 :: Option (username :: String, age :: Boolean)
 user13 = set' { age: true } user
 
 user14 :: User
@@ -3272,16 +3275,16 @@ user17 = delete' { age: unit, username: unit } user
 user18 :: Prim.Record ()
 user18 = get' {} user
 
-user19 :: Prim.Record ( age :: Int, username :: String )
+user19 :: Prim.Record (age :: Int, username :: String)
 user19 = get' { age: 0, username: "anonymous" } user
 
-user20 :: Prim.Record ( age :: String, username :: Data.Maybe.Maybe String )
+user20 :: Prim.Record (age :: String, username :: Data.Maybe.Maybe String)
 user20 = get' { age: Data.Maybe.maybe "unknown" show, username: Data.Maybe.Just "anonymous" } user
 
-user21 :: Option ( age :: Boolean, username :: String )
+user21 :: Option (age :: Boolean, username :: String)
 user21 = modify' { age: \_ -> true } user
 
-user22 :: Option ( age :: Boolean, username :: String )
+user22 :: Option (age :: Boolean, username :: String)
 user22 = alter { age: \(_ :: Data.Maybe.Maybe Int) -> Data.Maybe.Just true } user
 
 user23 :: User
@@ -3296,14 +3299,13 @@ user25 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Just "Pat" }
 user26 :: User
 user26 = fromRecord { age: Data.Maybe.Nothing, username: Data.Maybe.Nothing }
 
-user27 :: Option ( age1 :: Int, username :: String )
+user27 :: Option (age1 :: Int, username :: String)
 user27 = rename { age: Data.Symbol.SProxy :: Data.Symbol.SProxy "age1" } user
 
-user28 :: Option ( age :: Int, username2 :: String )
+user28 :: Option (age :: Int, username2 :: String)
 user28 = rename { username: Data.Symbol.SProxy :: Data.Symbol.SProxy "username2" } user
 
-type Greeting
-  = Record ( name :: String ) ( title :: String )
+type Greeting = Record (name :: String) (title :: String)
 
 greeting1 :: Greeting
 greeting1 = recordFromRecord { name: "Pat" }
@@ -3326,5 +3328,5 @@ greeting6 = recordSet { name: "Chris", title: Data.Maybe.Just "Dr." } greeting1
 greeting7 :: Greeting
 greeting7 = recordSet { name: "Chris", title: Data.Maybe.Nothing } greeting1
 
-greeting8 :: Record ( "Name" :: String ) ( "Title" :: String )
+greeting8 :: Record ("Name" :: String) ("Title" :: String)
 greeting8 = recordRename { name: Data.Symbol.SProxy :: Data.Symbol.SProxy "Name", title: Data.Symbol.SProxy :: Data.Symbol.SProxy "Title" } greeting1

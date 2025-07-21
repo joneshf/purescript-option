@@ -1,0 +1,53 @@
+name: Test
+
+on:
+  - push
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@63ca48f939ee3b8d835f4126562537df0fee5b91
+      - name: Cache Nix store
+        uses: nix-community/cache-nix-action@135667ec418502fa5a3598af6fb9eb733888ce6a
+        with:
+          # The key includes the os/arch pair as artifacts in the Nix store are platform-specific.
+          primary-key: nix-${{ format('{0}_{1}', runner.os, runner.arch) }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}
+          restore-prefixes-first-match: |
+            nix-${{ format('{0}_{1}', runner.os, runner.arch) }}-${{ hashFiles('flake.lock') }}-
+            nix-${{ format('{0}_{1}', runner.os, runner.arch) }}-
+      - name: Cache node_modules
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          # The key includes the os/arch pair as artifacts in `node_modules` can be platform-specific.
+          key: node_modules-${{ format('{0}_{1}', runner.os, runner.arch) }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}
+          path: "**/node_modules"
+          restore-keys: |
+            node_modules-${{ format('{0}_{1}', runner.os, runner.arch) }}-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-
+            node_modules-${{ format('{0}_{1}', runner.os, runner.arch) }}-${{ hashFiles('flake.lock') }}-
+            node_modules-${{ format('{0}_{1}', runner.os, runner.arch) }}-
+      - name: Cache bower_components
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          key: bower_components-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('bower.json') }}
+          path: bower_components
+          restore-keys: |
+            bower_components-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}-
+            bower_components-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-
+            bower_components-${{ hashFiles('flake.lock') }}-
+            bower_components-
+      - name: Cache output
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684
+        with:
+          key: output-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('bower.json') }}-${{ hashFiles('**/*.js', '**/*.purs') }}
+          path: output
+          restore-keys: |
+            output-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('bower.json') }}-
+            output-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-${{ hashFiles('**/package-lock.json') }}-
+            output-${{ hashFiles('flake.lock') }}-${{ hashFiles('**/*.nix') }}-
+            output-${{ hashFiles('flake.lock') }}-
+            output-
+      - name: Test
+        run: nix develop . --command make test

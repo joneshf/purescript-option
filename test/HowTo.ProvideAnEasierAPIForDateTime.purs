@@ -18,15 +18,15 @@ import Prim.Row as Prim.Row
 import Test.Spec as Test.Spec
 import Test.Spec.Assertions as Test.Spec.Assertions
 
-type Option
-  = ( day :: Int
-    , hour :: Int
-    , millisecond :: Int
-    , minute :: Int
-    , month :: Data.Date.Component.Month
-    , second :: Int
-    , year :: Int
-    )
+type Option =
+  ( day :: Int
+  , hour :: Int
+  , millisecond :: Int
+  , minute :: Int
+  , month :: Data.Date.Component.Month
+  , second :: Int
+  , year :: Int
+  )
 
 dateTime ::
   forall record.

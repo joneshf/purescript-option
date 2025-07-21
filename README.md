@@ -4,19 +4,19 @@ A data type for optional values.
 
 ## Table of Contents
 
-* [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
-* [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
-* [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
-* [How To: Make a function with required and optional values](#how-to-make-a-function-with-required-and-optional-values)
-* [How To: Make a function with required and optional values from a record](#how-to-make-a-function-with-required-and-optional-values-from-a-record)
-* [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
-* [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
-* [How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-simple-json)
-* [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
-* [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
+- [Explanation: Motivation for `Option _`](#explanation-motivation-for-option-_)
+- [How To: Make a function with optional values](#how-to-make-a-function-with-optional-values)
+- [How To: Make a function with optional values from a record](#how-to-make-a-function-with-optional-values-from-a-record)
+- [How To: Make a function with required and optional values](#how-to-make-a-function-with-required-and-optional-values)
+- [How To: Make a function with required and optional values from a record](#how-to-make-a-function-with-required-and-optional-values-from-a-record)
+- [How To: Decode and Encode JSON with optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-codec-argonaut)
+- [How To: Decode and Encode JSON with optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-optional-values-in-purescript-simple-json)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-argonaut)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-codec-argonaut`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-codec-argonaut)
+- [How To: Decode and Encode JSON with required and optional values in `purescript-simple-json`](#how-to-decode-and-encode-json-with-required-and-optional-values-in-purescript-simple-json)
+- [How To: Provide an easier API for `DateTime`](#how-to-provide-an-easier-api-for-datetime)
+- [Reference: `FromRecord _ _ _`](#reference-fromrecord-_-_-_)
 
 ## Explanation: Motivation for `Option _`
 
@@ -89,6 +89,7 @@ With the `greeting` function, we can pass in an option and alter the behavior:
 We've allowed people to override the behavior of the function with optional values!
 
 It might be instructive to compare how we might write a similar function using a `Record _` instead of `Option _`:
+
 ```PureScript
 greeting' ::
   Record ( name :: Data.Maybe.Maybe String, title :: Data.Maybe.Maybe String ) ->
@@ -110,6 +111,7 @@ To implement `greeting'`, nothing really changed.
 We used the built-in dot operator to fetch the keys out of the record, but we could have just as easily used `Record.get` (which would have highlighted the similarlities even more).
 
 To use `greeting'`, we force the users of `greeting'` to do always give us a value in the record:
+
 ```PureScript
 > User.greeting' { name: Data.Maybe.Nothing, title: Data.Maybe.Nothing }
 "Hello, World"
@@ -215,6 +217,7 @@ With the `greeting` function, we can pass in an option and alter the behavior:
 We've allowed people to override the behavior of the function with optional values!
 
 It might be instructive to compare how we might write a similar function using a `Record _` instead of `Option _`:
+
 ```PureScript
 greeting' ::
   Record ( name :: String, title :: Data.Maybe.Maybe String ) ->
@@ -232,6 +235,7 @@ We don't have to convert down to a language-level Record because the argument is
 That's the only difference as far as implementing `greeting'`.
 
 To use `greeting'`, we force the users of `greeting'` to do always give us a value in the record:
+
 ```PureScript
 > User.greeting' { name: "Pat", title: Data.Maybe.Nothing }
 "Hello, Pat"
@@ -318,6 +322,7 @@ parse string = case Data.Argonaut.Parser.jsonParser string of
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
 > parse """{}"""
 (Right (Option.fromRecord {}))
@@ -416,6 +421,7 @@ Unless both fields exist, we cannot decode the JSON object.
 Similarly, no matter what the values are, we always encode them into a JSON object.
 
 In order to emulate the behavior of an optional field, we have to name the record, and write our own instances:
+
 ```PureScript
 newtype Greeting
   = Greeting
@@ -834,6 +840,7 @@ writeJSON = Simple.JSON.writeJSON
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
 > readJSON """{}"""
 (Right (Option.fromRecord {}))
@@ -962,6 +969,7 @@ parse string = case Data.Argonaut.Parser.jsonParser string of
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
 > parse """{}"""
 (Left "An error occurred while decoding a JSON value:\n  At object key 'name':\n  No value was found.")
@@ -1050,6 +1058,7 @@ Unless both fields exist, we cannot decode the JSON object.
 Similarly, no matter what the values are, we always encode them into a JSON object.
 
 In order to emulate the behavior of an optional field, we have to name the record, and write our own instances:
+
 ```PureScript
 import Prelude
 import Data.Argonaut.Core as Data.Argonaut.Core
@@ -1495,6 +1504,7 @@ writeJSON = Simple.JSON.writeJSON
 ```
 
 We can give that a spin with some different JSON values:
+
 ```PureScript
 > parse """{}"""
 (Left "Error at property \"name\": Type mismatch: expected String, found Undefined")
@@ -1585,6 +1595,7 @@ For instance, constructing a `Data.DateTime.DateTime` can be done by passing in 
 The issue is, how do we construct a `Data.Date.Date` or `Data.Time.Time`.
 
 One way to get construct these values is to use the `Data.Enum.Enum` instance for both of them:
+
 ```PureScript
 > Data.DateTime.DateTime bottom bottom
 (DateTime (Date (Year -271820) January (Day 1)) (Time (Hour 0) (Minute 0) (Second 0) (Millisecond 0)))
@@ -1731,10 +1742,13 @@ E.g. `FromRecord () () ( name :: String )` says that the `Record ()` has no fiel
 Since there is syntax for creating records, but no syntax for creating options, this typeclass can be useful for providing an easier to use interface to options.
 
 E.g. Someone can say:
+
 ```PureScript
 Option.fromRecord' { foo: true, bar: 31 }
 ```
+
 Instead of having to say:
+
 ```PureScript
 Option.insert
   (Data.Symbol.SProxy :: _ "foo")
