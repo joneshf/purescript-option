@@ -58,12 +58,12 @@ greeting :: Option.Option ( name :: String, title :: String ) -> String
 greeting option = "Hello, " <> title' <> name'
   where
   name' :: String
-  name' = case Option.get (Data.Symbol.SProxy :: _ "name") option of
+  name' = case Option.get (Type.Proxy.Proxy :: _ "name") option of
     Data.Maybe.Just name -> name
     Data.Maybe.Nothing -> "World"
 
   title' :: String
-  title' = case Option.get (Data.Symbol.SProxy :: _ "title") option of
+  title' = case Option.get (Type.Proxy.Proxy :: _ "title") option of
     Data.Maybe.Just title -> title <> " "
     Data.Maybe.Nothing -> ""
 ```
@@ -144,7 +144,7 @@ greeting ::
 greeting record = "Hello, " <> title' <> name'
   where
   name' :: String
-  name' = case Option.get (Data.Symbol.SProxy :: _ "name") option of
+  name' = case Option.get (Type.Proxy.Proxy :: _ "name") option of
     Data.Maybe.Just name -> name
     Data.Maybe.Nothing -> "World"
 
@@ -152,7 +152,7 @@ greeting record = "Hello, " <> title' <> name'
   option = Option.fromRecord record
 
   title' :: String
-  title' = case Option.get (Data.Symbol.SProxy :: _ "title") option of
+  title' = case Option.get (Type.Proxy.Proxy :: _ "title") option of
     Data.Maybe.Just title -> title <> " "
     Data.Maybe.Nothing -> ""
 ```
@@ -717,7 +717,7 @@ optionalField ::
   Data.Symbol.IsSymbol label =>
   Prim.Row.Cons label (Data.Maybe.Maybe value) record' record =>
   Prim.Row.Lacks label record' =>
-  Data.Symbol.SProxy label ->
+  Type.Proxy.Proxy label ->
   Data.Codec.Argonaut.JsonCodec value ->
   Data.Codec.Argonaut.JPropCodec (Record record') ->
   Data.Codec.Argonaut.JPropCodec (Record record)
@@ -774,8 +774,8 @@ jsonCodec''' :: Data.Codec.Argonaut.JsonCodec (Record ( name :: Data.Maybe.Maybe
 jsonCodec''' =
   Data.Codec.Argonaut.object
     "Greeting"
-    ( optionalField (Data.Symbol.SProxy :: _ "name") Data.Codec.Argonaut.string
-        $ optionalField (Data.Symbol.SProxy :: _ "title") Data.Codec.Argonaut.string
+    ( optionalField (Type.Proxy.Proxy :: _ "name") Data.Codec.Argonaut.string
+        $ optionalField (Type.Proxy.Proxy :: _ "title") Data.Codec.Argonaut.string
         $ Data.Codec.Argonaut.record
     )
 
@@ -1362,18 +1362,18 @@ import Control.Monad.Writer.Class as Control.Monad.Writer.Class
 import Data.Codec as Data.Codec
 import Data.List as Data.List
 import Data.Profunctor.Star as Data.Profunctor.Star
-import Data.Symbol as Data.Symbol
 import Data.Tuple as Data.Tuple
 import Foreign.Object as Foreign.Object
 import Prim.Row as Prim.Row
 import Record as Record
+import Type.Proxy as Type.Proxy
 
 optionalField ::
   forall label record record' value.
   Data.Symbol.IsSymbol label =>
   Prim.Row.Cons label (Data.Maybe.Maybe value) record' record =>
   Prim.Row.Lacks label record' =>
-  Data.Symbol.SProxy label ->
+  Type.Proxy.Proxy label ->
   Data.Codec.Argonaut.JsonCodec value ->
   Data.Codec.Argonaut.JPropCodec (Record record') ->
   Data.Codec.Argonaut.JPropCodec (Record record)
@@ -1430,8 +1430,8 @@ jsonCodec''' :: Data.Codec.Argonaut.JsonCodec (Record ( name :: String, title ::
 jsonCodec''' =
   Data.Codec.Argonaut.object
     "Greeting"
-    ( Data.Codec.Argonaut.recordProp (Data.Symbol.SProxy :: _ "name") Data.Codec.Argonaut.string
-        $ optionalField (Data.Symbol.SProxy :: _ "title") Data.Codec.Argonaut.string
+    ( Data.Codec.Argonaut.recordProp (Type.Proxy.Proxy :: _ "name") Data.Codec.Argonaut.string
+        $ optionalField (Type.Proxy.Proxy :: _ "title") Data.Codec.Argonaut.string
         $ Data.Codec.Argonaut.record
     )
 
@@ -1670,13 +1670,13 @@ dateTime record = Data.DateTime.DateTime date time
   date = Data.Date.canonicalDate year month day
     where
     day :: Data.Date.Component.Day
-    day = get (Data.Symbol.SProxy :: _ "day")
+    day = get (Type.Proxy.Proxy :: _ "day")
 
     month :: Data.Date.Component.Month
-    month = Option.getWithDefault bottom (Data.Symbol.SProxy :: _ "month") options
+    month = Option.getWithDefault bottom (Type.Proxy.Proxy :: _ "month") options
 
     year :: Data.Date.Component.Year
-    year = get (Data.Symbol.SProxy :: _ "year")
+    year = get (Type.Proxy.Proxy :: _ "year")
 
   get ::
     forall label proxy record' value.
@@ -1696,16 +1696,16 @@ dateTime record = Data.DateTime.DateTime date time
   time = Data.Time.Time hour minute second millisecond
     where
     hour :: Data.Time.Component.Hour
-    hour = get (Data.Symbol.SProxy :: _ "hour")
+    hour = get (Type.Proxy.Proxy :: _ "hour")
 
     minute :: Data.Time.Component.Minute
-    minute = get (Data.Symbol.SProxy :: _ "minute")
+    minute = get (Type.Proxy.Proxy :: _ "minute")
 
     millisecond :: Data.Time.Component.Millisecond
-    millisecond = get (Data.Symbol.SProxy :: _ "millisecond")
+    millisecond = get (Type.Proxy.Proxy :: _ "millisecond")
 
     second :: Data.Time.Component.Second
-    second = get (Data.Symbol.SProxy :: _ "second")
+    second = get (Type.Proxy.Proxy :: _ "second")
 ```
 
 Now, we can construct a `Data.DateTime.DateTime` fairly easily:
@@ -1751,10 +1751,10 @@ Instead of having to say:
 
 ```PureScript
 Option.insert
-  (Data.Symbol.SProxy :: _ "foo")
+  (Type.Proxy.Proxy :: _ "foo")
   true
   ( Option.insert
-      (Data.Symbol.SProxy :: _ "bar")
+      (Type.Proxy.Proxy :: _ "bar")
       31
       Option.empty
   )
